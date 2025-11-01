@@ -1,8 +1,8 @@
 import itertools
 import pandas as pd
 import matplotlib.pyplot as plt
-from modules.backtest import BacktestEngine
-from modules.data_loader import DataLoader
+from src.backtest.backtest_engine import BacktestEngine
+from src.backtest.data_loader import DataLoader
 
 
 class BenchmarkEngine:
