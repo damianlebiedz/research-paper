@@ -7,12 +7,6 @@ import statsmodels.api as sm
 from tqdm import tqdm
 
 
-def pearson_matrix(df, rolling_window=None):
-    if rolling_window:
-        return df.rolling(rolling_window).corr()
-    return df.corr()
-
-
 def engle_granger_matrix(df):
     n = df.shape[1]
     result = pd.DataFrame(np.nan, index=df.columns, columns=df.columns)

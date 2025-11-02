@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 
-from src.models.pair_data_model import PairData
+from src.data_services.data_models import PairData
 
 
 def minmax_scale(series: pd.Series) -> pd.Series:
