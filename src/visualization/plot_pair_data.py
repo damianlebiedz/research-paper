@@ -2,6 +2,33 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def plot_prices(pair_data, start: str, end: str, interval: str):
+    """Plot scaled prices of both assets in a pair and save to the 'results' folder."""
+    x, y = pair_data.x, pair_data.y
+    df = pair_data.data.copy()
+
+    results_dir = Path().resolve().parent / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    plt.figure(figsize=(10, 5))
+    sns.lineplot(data=df[[f"{x}", f"{y}"]])
+    plt.title(f"Prices: {x} vs {y}")
+    plt.ylabel("Value")
+    plt.xlabel("Date")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    filename = f"{x}_{y}_prices_{start}_{end}_{interval}.png".replace(":", "-")
+    save_path = results_dir / filename
+    plt.savefig(save_path, dpi=150)
+    logger.debug(f"Saved prices plot: {save_path}")
+    plt.show()
+
 
 def plot_scaled_prices(pair_data, start: str, end: str, interval: str):
     """Plot scaled prices of both assets in a pair and save to the 'results' folder."""
@@ -22,7 +49,7 @@ def plot_scaled_prices(pair_data, start: str, end: str, interval: str):
     filename = f"{x}_{y}_scaled_prices_{start}_{end}_{interval}.png".replace(":", "-")
     save_path = results_dir / filename
     plt.savefig(save_path, dpi=150)
-    print(f"Saved scaled prices plot: {save_path}")
+    logger.debug(f"Saved scaled prices plot: {save_path}")
     plt.show()
 
 
@@ -55,5 +82,5 @@ def plot_zscore_with_thresholds(pair_data, start: str, end: str, interval: str, 
     filename = f"{x}_{y}_zscore_{start}_{end}_{interval}.png".replace(":", "-")
     save_path = results_dir / filename
     plt.savefig(save_path, dpi=150)
-    print(f"Saved Z-Score plot: {save_path}")
+    logger.debug(f"Saved Z-Score plot: {save_path}")
     plt.show()
