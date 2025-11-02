@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from strategies.base_strategy import BaseStrategy
+from src.strategies.base_strategy import BaseStrategy
 
 
 class PairsTradingStrategy(BaseStrategy):
