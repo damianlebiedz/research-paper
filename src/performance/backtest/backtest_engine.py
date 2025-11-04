@@ -34,7 +34,6 @@ class BacktestEngine:
             f"{'Trades':20}: {int(stats['Trades']):6d}\n"
             f"{'Sharpe Approx':20}: {stats['Sharpe Approx']:6.2f}"
         )
-
         return report
 
     def plot_results(self, data):
@@ -44,8 +43,17 @@ class BacktestEngine:
         trades = self.strategy.trades
         results = self.results
 
-        ax1.plot(data.index, data[tickers[0]], label=tickers[0], color="blue")
-        ax1.plot(data.index, data[tickers[1]], label=tickers[1], color="orange")
+        cols = []
+        for t in tickers:
+            if t in data.columns:
+                cols.append(t)
+            elif f"{t}_scaled" in data.columns:
+                cols.append(f"{t}_scaled")
+            else:
+                raise KeyError(f"Column not found: {t}")
+
+        ax1.plot(data.index, data[cols[0]], label=tickers[0], color="blue")
+        ax1.plot(data.index, data[cols[1]], label=tickers[1], color="orange")
 
         for action, date in trades:
             if action == "open_long":
@@ -57,10 +65,9 @@ class BacktestEngine:
 
         ax1.set_ylabel("Price")
         ax1.legend(loc="upper left")
-
         ax2 = ax1.twinx()
         ax2.plot(results.index, results["Equity"], label="Equity", color="black")
         ax2.set_ylabel("Equity")
         ax2.legend(loc="upper right")
-
+        ax2.grid(False)
         plt.show()
