@@ -1,4 +1,6 @@
 from pathlib import Path
+from typing import List
+
 import pandas as pd
 
 from src.data_services.data_models import PairData
@@ -7,6 +9,33 @@ from src.data_services.data_models import PairData
 def minmax_scale(series: pd.Series) -> pd.Series:
     """Scale a series to range [0, 1]."""
     return (series - series.min()) / (series.max() - series.min())
+
+
+def load_data(tickers: List[str], start: str, end: str, interval: str, data_dir: str = "data") -> pd.DataFrame:
+    """Load data for a list of assets and return as DataFrame."""
+    dfs = []
+    base_dir = Path().resolve().parent / data_dir
+
+    for ticker in tickers:
+        ticker_dir = base_dir / ticker
+        if not ticker_dir.exists():
+            raise FileNotFoundError(f"Directory not found: {ticker_dir}")
+
+        files = list(ticker_dir.glob(f"*_{interval}.csv"))
+        if not files:
+            raise FileNotFoundError(f"No CSV file with interval '{interval}' found in {ticker_dir}")
+
+        df = pd.read_csv(files[0], parse_dates=["open_time", "close_time"])
+        df = df.set_index("open_time")[["close"]].rename(columns={"close": ticker})
+        dfs.append(df)
+
+    data = pd.concat(dfs, axis=1)
+    data = data[(data.index >= start) & (data.index <= end)]
+
+    if data.empty:
+        raise ValueError(f"No data available for tickers {tickers} in range {start} to {end}")
+
+    return data
 
 
 def load_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str = "data") -> PairData:
