@@ -1,12 +1,9 @@
 import numpy as np
 import pandas as pd
 
-from src.strategies.base_strategy import BaseStrategy
 
-
-class PairsTradingStrategy(BaseStrategy):
+class PairsTradingStrategy:
     def __init__(self, tickers, entry_threshold, exit_threshold, size=1):
-        super().__init__(tickers, size)
         self.tickers = tickers
         self.entry_threshold = entry_threshold
         self.exit_threshold = exit_threshold

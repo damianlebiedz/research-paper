@@ -1,6 +1,6 @@
+from functools import reduce
 from pathlib import Path
 from typing import List
-
 import pandas as pd
 
 from src.data_services.data_models import PairData
@@ -79,3 +79,12 @@ def load_and_prepare_pair(x: str, y: str, start: str, end: str, interval: str, d
     """Load and prepare a single pair."""
     pair_data = load_pair(x, y, start, end, interval, data_dir)
     return prepare_pair(pair_data)
+
+
+def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:
+    trimmed = []
+    for df, cols in zip(dfs, keep_cols):
+        trimmed.append(df[['pair'] + cols])
+
+    merged = reduce(lambda left, right: pd.merge(left, right, on='pair', how='outer'), trimmed)
+    return merged

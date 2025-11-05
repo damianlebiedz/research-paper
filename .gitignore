@@ -1,5 +1,8 @@
 .idea
 __pycache__
 
-data
-results
+data/*
+!data/.ignore
+
+results/*
+!results/.ignore
