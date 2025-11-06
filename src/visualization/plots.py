@@ -1,3 +1,4 @@
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -7,7 +8,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def plot_prices(pair_data, start: str, end: str, interval: str):
+def plot_prices(pair_data, start: str, end: str, interval: str) -> None:
     x, y = pair_data.x, pair_data.y
     df = pair_data.data.copy()
 
@@ -29,7 +30,7 @@ def plot_prices(pair_data, start: str, end: str, interval: str):
     plt.show()
 
 
-def plot_scaled_prices(pair_data, start: str, end: str, interval: str):
+def plot_scaled_prices(pair_data, start: str, end: str, interval: str) -> None:
     x, y = pair_data.x, pair_data.y
     df = pair_data.data.copy()
 
@@ -52,7 +53,7 @@ def plot_scaled_prices(pair_data, start: str, end: str, interval: str):
 
 
 def plot_zscore_with_thresholds(pair_data, start: str, end: str, interval: str, open_threshold: float = 2.0,
-                                close_threshold: float = 0):
+                                close_threshold: float = 0) -> None:
     x, y = pair_data.x, pair_data.y
     df = pair_data.data.copy()
 
@@ -79,4 +80,23 @@ def plot_zscore_with_thresholds(pair_data, start: str, end: str, interval: str, 
     save_path = results_dir / filename
     plt.savefig(save_path, dpi=150)
     logger.debug(f"Saved Z-Score plot: {save_path}")
+    plt.show()
+
+
+def plot_pnl_and_positions(df: pd.DataFrame) -> None:
+    fig, ax1 = plt.subplots(figsize=(14, 6))
+
+    ax1.plot(df.index, df['pnl_pct'], label='PnL%', linewidth=1.8)
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('PnL%', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+    ax2 = ax1.twinx()
+    ax2.plot(df.index, df['position'], color='tab:red', linestyle='--', label='Position')
+    ax2.set_ylabel('Position (-1, 0, 1)', color='tab:red')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+    ax2.set_yticks([-1, 0, 1])
+
+    fig.tight_layout()
+    plt.title('PnL% vs Position')
     plt.show()

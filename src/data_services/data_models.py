@@ -9,3 +9,4 @@ class PairData:
     x: str
     y: str
     data: pd.DataFrame
+
