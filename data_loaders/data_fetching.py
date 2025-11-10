@@ -10,9 +10,14 @@ limit_per_request = 1000
 
 
 def fetch_data_from_binance(symbol: str, interval: str, start_str: str, end_str: str, date_format: str) -> None:
-    filename = f"data/{symbol}/{symbol}_{start_str.replace('.', '')}-{end_str.replace('.', '')}_{interval}.csv"
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    DATA_DIR = os.path.join(ROOT_DIR, "data")
+    filename = os.path.join(DATA_DIR, symbol,
+                            f"{symbol}_{start_str.replace('.', '')}-{end_str.replace('.', '')}_{interval}.csv")
 
     if os.path.isfile(filename):
+        print("Sprawdzam plik:", os.path.abspath(filename))
+
         print(f"{filename} already exists, skipping.")
         return
 
@@ -70,14 +75,14 @@ def fetch_data_from_binance(symbol: str, interval: str, start_str: str, end_str:
     num_cols = ["open", "high", "low", "close", "volume", "quote_asset_volume", "taker_buy_base", "taker_buy_quote"]
     df[num_cols] = df[num_cols].astype(float)
 
-    os.makedirs(f"data/{symbol}", exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, symbol), exist_ok=True)
     df.to_csv(filename, index=False, encoding='utf-8-sig')
     print(f"Data saved to: {filename}")
 
 
 if __name__ == "__main__":
-    tickers = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "DOTUSDT", "LINKUSDT",
-               "LTCUSDT"]
+    tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "DOTUSDT", "LINKUSDT",
+               "TRXUSDT", "LTCUSDT", "SHIBUSDT", "ICPUSDT", "BCHUSDT"]
 
     for ticker in tickers:
         fetch_data_from_binance(

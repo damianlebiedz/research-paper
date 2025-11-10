@@ -6,9 +6,18 @@ import pandas as pd
 from src.data_services.data_models import PairData
 
 
-def minmax_scale(series: pd.Series) -> pd.Series:
-    """Scale a series to range [0, 1]."""
-    return (series - series.min()) / (series.max() - series.min())
+def scale_prices(pair_data: PairData) -> PairData:
+    """Scale prices to range [0, 1]."""
+    df = pair_data.data.copy()
+
+    def minmax_scale(series: pd.Series) -> pd.Series:
+        """Scale a series to range [0, 1]."""
+        return (series - series.min()) / (series.max() - series.min())
+
+    df[f"{pair_data.x}_scaled"] = minmax_scale(df[pair_data.x])
+    df[f"{pair_data.y}_scaled"] = minmax_scale(df[pair_data.y])
+    pair_data.data = df
+    return pair_data
 
 
 def load_data(tickers: List[str], start: str, end: str, interval: str, data_dir: str = "data") -> pd.DataFrame:
@@ -62,23 +71,16 @@ def load_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str
     if data.empty:
         raise ValueError(f"No data available for tickers {[x, y]} in range {start} to {end}")
 
-    return PairData(x=x, y=y, data=data)
+    return PairData(x=x, y=y, start=start, end=end, interval=interval, data=data)
 
 
-def prepare_pair(pair_data: PairData) -> PairData:
-    """Prepare a loaded pair: compute spread, z-score, minmax scaling."""
+def calculate_zscore(pair_data: PairData) -> PairData:
+    """Calculate z-score for pair data."""
     df = pair_data.data.copy()
     df["Spread"] = df[pair_data.x] - df[pair_data.y]
     df["Z-Score"] = (df["Spread"] - df["Spread"].mean()) / df["Spread"].std()
-    df[f"{pair_data.x}_scaled"] = minmax_scale(df[pair_data.x])
-    df[f"{pair_data.y}_scaled"] = minmax_scale(df[pair_data.y])
-    return PairData(x=pair_data.x, y=pair_data.y, data=df)
-
-
-def load_and_prepare_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str = "data") -> PairData:
-    """Load and prepare a single pair."""
-    pair_data = load_pair(x, y, start, end, interval, data_dir)
-    return prepare_pair(pair_data)
+    pair_data.data = df
+    return pair_data
 
 
 def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:
