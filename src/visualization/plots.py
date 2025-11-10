@@ -30,9 +30,12 @@ def plot_prices(pair_data, start: str, end: str, interval: str) -> None:
     plt.show()
 
 
-def plot_scaled_prices(pair_data, start: str, end: str, interval: str) -> None:
+def plot_scaled_prices(pair_data) -> None:
     x, y = pair_data.x, pair_data.y
-    df = pair_data.data.copy()
+    start = pair_data.start
+    end = pair_data.end
+    interval = pair_data.interval
+    df = pair_data.data
 
     results_dir = Path().resolve().parent / "results"
     results_dir.mkdir(parents=True, exist_ok=True)

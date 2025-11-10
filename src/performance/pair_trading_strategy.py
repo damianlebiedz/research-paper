@@ -151,11 +151,10 @@ def calculate_stats(data: PairData) -> str:
     total_return_brutto, sharpe_brutto = compute_stats(df["realized_pnl"])
     total_return_netto, sharpe_netto = compute_stats(df["net_pnl"])
 
-    report = (
-        f"Backtest Statistics:\n"
-        f"{'Total Return % (brutto)':20}: {total_return_brutto:6.2f}%\n"
-        f"{'Total Return % (netto)':20}: {total_return_netto:6.2f}%\n"
-        f"{'Sharpe Approx (brutto)':20}: {sharpe_brutto:6.2f}\n"
-        f"{'Sharpe Approx (netto)':20}: {sharpe_netto:6.2f}"
-    )
-    return report
+    stats = {
+        "total_return_brutto": float(total_return_brutto),
+        "total_return_netto": float(total_return_netto),
+        "sharpe_brutto": float(sharpe_brutto),
+        "sharpe_netto": float(sharpe_netto)
+    }
+    return stats
