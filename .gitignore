@@ -1,4 +1,8 @@
 .idea
 __pycache__
-data
-TODO.md
+
+data/*
+!data/.ignore
+
+results/*
+!results/.ignore
