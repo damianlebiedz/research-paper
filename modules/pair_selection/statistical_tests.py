@@ -4,12 +4,15 @@ import pandas as pd
 from statsmodels.tsa.stattools import coint
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
+from modules.data_services.normalization import cumulative_returns_index
+
 
 def sum_of_standard_deviation(df: pd.DataFrame) -> pd.DataFrame:
+    df_cum_returns = cumulative_returns_index(df)
     results = []
 
-    for x, y in combinations(df.columns, 2):
-        ssd = np.sum((df[x] - df[y]) ** 2)
+    for x, y in combinations(df_cum_returns.columns, 2):
+        ssd = np.sum((df_cum_returns[x] - df_cum_returns[y]) ** 2)
         results.append({'pair': f'{x}-{y}', 'ssd': ssd})
 
     results_df = pd.DataFrame(results)

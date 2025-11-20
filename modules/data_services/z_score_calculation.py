@@ -2,34 +2,40 @@ import numpy as np
 import statsmodels.api as sm
 
 from modules.data_services.data_models import PairData
+from modules.data_services.normalization import cumulative_returns_index
 
 
-def calculate_rolling_zscore(pair_data: PairData, rolling_window: int, source: str = "price") -> PairData:
+def calculate_rolling_zscore(pair_data: PairData, rolling_window: int, source: str = "prices") -> PairData:
     """
     Calculate rolling z-score for a pair based on a selected source.
     Automatically finds the first index with enough historical data for pre-training.
     Raises ValueError if not enough data for pre-training.
     """
     df = pair_data.data.copy()
+    n = len(df)
 
-    if source == "price":
+    if n < rolling_window:
+        raise ValueError(f"Not enough data: need at least {rolling_window} historical points.")
+
+    if source == "prices":
         df['spread'] = df[pair_data.x] - df[pair_data.y]
-    elif source == "return":
+    elif source == "returns":
         df['spread'] = df[pair_data.x].pct_change() - df[pair_data.y].pct_change()
-    elif source == "log_return":
+    elif source == "log_returns":
         df['spread'] = np.log(df[pair_data.x]) - np.log(df[pair_data.y])
+    elif source == "cum_returns":
+        df_tmp = cumulative_returns_index(df[[pair_data.x, pair_data.y]])
+        df['spread'] = df_tmp[pair_data.x] - df_tmp[pair_data.y]
     else:
-        raise ValueError("source must be one of ['price', 'return', 'log_return']")
+        raise ValueError("source must be one of ['prices', 'returns', 'log_returns', 'cum_returns]")
 
     spreads = df['spread'].values
-    z_scores = [None] * len(df)
+    z_scores = [None] * n
 
     for i in range(len(df)):
         if i < rolling_window:
             continue
         window = spreads[i - rolling_window:i]
-        if len(window) < rolling_window:
-            raise ValueError(f"Not enough data for pre-training at index {df.index[i]}")
         mean = np.mean(window)
         std = np.std(window)
         z_scores[i] = (spreads[i] - mean) / std if std != 0 else None
@@ -46,46 +52,37 @@ def calculate_rolling_zscore_with_rolling_beta(pair_data: PairData, rolling_wind
     Raises ValueError if not enough data for pre-training.
     """
     df = pair_data.data.copy()
+    n = len(df)
 
-    spreads = []
-    z_scores = []
-    betas = []
+    if n < rolling_window:
+        raise ValueError(f"Not enough data: need at least {rolling_window} historical points.")
+
+    betas = [None] * n
+    spreads = [None] * n
+    z_scores = [None] * n
 
     start_index = rolling_window
-    if start_index > len(df):
-        raise ValueError(f"Not enough data for pre-training: need at least {rolling_window} historical points.")
-
-    first_valid_index = None
-    for i in range(start_index, len(df)):
-        if i - rolling_window >= 0:
-            first_valid_index = i
-            break
-    if first_valid_index is None:
-        raise ValueError("Not enough data for pre-training. Please provide at least rolling_window historical points.")
-
-    for _ in range(first_valid_index):
-        spreads.append(None)
-        z_scores.append(None)
-        betas.append(None)
-
-    for i in range(first_valid_index, len(df)):
-        window_df = df.iloc[i - rolling_window:i]
+    for i in range(start_index, n):
+        window_df = df.iloc[i - rolling_window: i]
 
         X = sm.add_constant(window_df[pair_data.y])
         y = window_df[pair_data.x]
-        model = sm.OLS(y, X).fit()
+        model = sm.OLS(y, X, missing='drop').fit()
+        if pair_data.y not in model.params:
+            continue
+
         beta = model.params[pair_data.y]
+        betas[i] = beta
 
         spread_t = df[pair_data.x].iloc[i] - beta * df[pair_data.y].iloc[i]
+        spreads[i] = spread_t
 
-        mean_t = (window_df[pair_data.x] - beta * window_df[pair_data.y]).mean()
-        std_t = (window_df[pair_data.x] - beta * window_df[pair_data.y]).std()
+        window_spread = window_df[pair_data.x] - beta * window_df[pair_data.y]
+        mean_t = window_spread.mean()
+        std_t = window_spread.std()
 
         z_t = (spread_t - mean_t) / std_t if std_t != 0 else None
-
-        spreads.append(spread_t)
-        z_scores.append(z_t)
-        betas.append(beta)
+        z_scores[i] = z_t
 
     df['beta'] = betas
     df['spread'] = spreads

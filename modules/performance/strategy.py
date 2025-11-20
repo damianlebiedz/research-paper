@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 
-from modules.data_services.data_models import PairData
+from modules.data_services.data_models import PairData, PortfolioData
+from modules.data_services.data_pipeline import load_pair
+from modules.data_services.data_utils import calc_portfolio_stats, pre_training_start
+from modules.data_services.z_score_calculation import calculate_rolling_zscore_with_rolling_beta, \
+    calculate_rolling_zscore
 
 
 def generate_action_space(pair_data: PairData, entry_threshold: float = None,
@@ -45,23 +49,24 @@ def generate_action_space(pair_data: PairData, entry_threshold: float = None,
         zscore_i = zscore.iloc[i]
         entry_thr_i = entry_thr.iloc[i]
         exit_thr_i = exit_thr.iloc[i]
-        if action.iloc[i - 1] == 0:
-            if zscore_i < -entry_thr_i:
-                action.iloc[i] = 1
-            elif zscore_i > entry_thr_i:
-                action.iloc[i] = -1
-        elif action.iloc[i - 1] == 1:
-            if zscore_i >= -exit_thr_i:
-                action.iloc[i] = 0
+        if zscore_i is not None:
+            if action.iloc[i - 1] == 0:
+                if zscore_i < -entry_thr_i:
+                    action.iloc[i] = 1
+                elif zscore_i > entry_thr_i:
+                    action.iloc[i] = -1
+            elif action.iloc[i - 1] == 1:
+                if zscore_i >= -exit_thr_i:
+                    action.iloc[i] = 0
+                else:
+                    action.iloc[i] = 1
+            elif action.iloc[i - 1] == -1:
+                if zscore_i <= exit_thr_i:
+                    action.iloc[i] = 0
+                else:
+                    action.iloc[i] = -1
             else:
-                action.iloc[i] = 1
-        elif action.iloc[i - 1] == -1:
-            if zscore_i <= exit_thr_i:
-                action.iloc[i] = 0
-            else:
-                action.iloc[i] = -1
-        else:
-            action[i] = action[i - 1]
+                action[i] = action[i - 1]
 
     df['action'] = action
     pair_data.data = df
@@ -189,5 +194,49 @@ def calculate_stats(pair_data: PairData) -> pd.DataFrame:
         "0% fee": list(brutto_stats.values()),
         f"{fee_rate * 100}% fee": list(netto_stats.values())
     }).set_index("metric")
-
     return stats_df
+
+
+def run_strategy(pairs: list[str], trading_start: str, trading_end: str, interval: str,
+                 window_in_steps: int, z_score_method: str, entry_threshold: float = None, exit_threshold: float = None,
+                 position_size: float = None, initial_cash: float = 1000000, fee_rate: float = 0) -> PortfolioData:
+    """Run pair trading strategy on a list of pairs."""
+    n = len(pairs)
+    portfolio = PortfolioData(start=trading_start, end=trading_end, interval=interval, fee_rate=fee_rate)
+    pt_start = pre_training_start(start=trading_start, interval=interval, rolling_window_steps=window_in_steps)
+    for pair in pairs:
+        x, y = pair.split('-')
+        data = load_pair(x=x, y=y, start=pt_start, end=trading_end, interval=interval)
+
+        if z_score_method == 'rolling_beta':
+            calculate_rolling_zscore_with_rolling_beta(data, rolling_window=window_in_steps)
+        elif z_score_method == 'prices':
+            calculate_rolling_zscore(data, rolling_window=window_in_steps, source='prices')
+        elif z_score_method == 'returns':
+            calculate_rolling_zscore(data, rolling_window=window_in_steps, source='returns')
+        elif z_score_method == 'log_returns':
+            calculate_rolling_zscore(data, rolling_window=window_in_steps, source='log_returns')
+        elif z_score_method == 'cum_returns':
+            calculate_rolling_zscore(data, rolling_window=window_in_steps, source='cum_returns')
+        else:
+            raise ValueError(f"Unknown z_score_method: {z_score_method}")
+
+        data.start = trading_start
+        generate_action_space(pair_data=data, entry_threshold=entry_threshold, exit_threshold=exit_threshold,
+                              position_size=position_size)
+        benchmark_strategy(pair_data=data, initial_cash=initial_cash, fee_rate=fee_rate)
+
+        data.fee_rate = fee_rate
+        data.stats = calculate_stats(data)
+        portfolio.pairs_data.append(data)
+
+        if portfolio.data is None:
+            portfolio.data = data.data[['fees_paid', 'realized_pnl', 'cash', 'net_pnl']].copy()
+        else:
+            portfolio.data += data.data[['fees_paid', 'realized_pnl', 'cash', 'net_pnl']]
+        portfolio.data['pnl_pct'] = 1 + portfolio.data['realized_pnl'] / initial_cash * n
+        portfolio.data['net_pnl_pct'] = 1 + portfolio.data['net_pnl'] / initial_cash * n
+
+    portfolio.stats = calculate_stats(portfolio)
+    portfolio.summary = calc_portfolio_stats(portfolio)
+    return portfolio

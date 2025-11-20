@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 import pandas as pd
 
 
@@ -11,11 +12,18 @@ class PairData:
     end: str
     interval: str
     data: pd.DataFrame
-    stats: pd.DataFrame
+    stats: Optional[pd.DataFrame] = None
     fee_rate: float = 0
 
 
 @dataclass
 class PortfolioData:
     """Holds data for one portfolio."""
+    start: str
+    end: str
+    interval: str
+    data: Optional[pd.DataFrame] = None
+    stats: Optional[pd.DataFrame] = None
+    summary: Optional[pd.DataFrame] = None
     pairs_data: list[PairData] = field(default_factory=list)
+    fee_rate: float = 0
