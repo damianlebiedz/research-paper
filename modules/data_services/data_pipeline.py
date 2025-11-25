@@ -2,7 +2,7 @@ from functools import reduce
 from pathlib import Path
 import pandas as pd
 
-from modules.data_services.data_models import PairData
+from modules.data_services.data_models import Pair
 
 
 def load_single_ticker(ticker: str, start: str, end: str, interval: str, base_dir: Path) -> pd.DataFrame:
@@ -40,8 +40,8 @@ def load_data(tickers: list[str], start: str, end: str, interval: str, data_dir:
     return data
 
 
-def load_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str = "data") -> PairData:
-    """Load data for a single pair and return as PairData."""
+def load_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str = "data") -> Pair:
+    """Load data for a single pair and return as Pair."""
     base_dir = Path().resolve().parent / data_dir
 
     df_x = load_single_ticker(x, start, end, interval, base_dir)
@@ -53,7 +53,7 @@ def load_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str
     if data.empty:
         raise ValueError(f"No data available for tickers {[x, y]} in range {start} to {end}")
 
-    return PairData(x=x, y=y, start=start, end=end, interval=interval, data=data)
+    return Pair(x=x, y=y, start=start, end=end, interval=interval, data=data)
 
 
 def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:

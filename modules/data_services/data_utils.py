@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import pandas as pd
 
-from modules.data_services.data_models import PortfolioData, PairData
+from modules.data_services.data_models import Portfolio, Pair
 
 
 def get_steps(interval: str) -> int:
@@ -36,7 +36,7 @@ def pre_training_start(start: str, interval: str, rolling_window_steps: float) -
     return new_date_object.strftime("%Y-%m-%d")
 
 
-def calc_portfolio_stats(portfolio: PortfolioData) -> pd.DataFrame:
+def calc_portfolio_summary(portfolio: Portfolio) -> pd.DataFrame:
     rows = []
     row_labels = []
 
@@ -45,23 +45,31 @@ def calc_portfolio_stats(portfolio: PortfolioData) -> pd.DataFrame:
             continue
 
         pair_name = f"{pair_data.x}-{pair_data.y}"
-        df = pair_data.stats.copy()
-        df = df.T
+        df = pair_data.stats.T
         rows.append(df)
         row_labels.append(pair_name)
 
     if portfolio.stats is not None:
-        df_all = portfolio.stats.copy().T
+        df_all = portfolio.stats.T
         rows.append(df_all)
         row_labels.append("Summary")
 
+    if not rows:
+        return pd.DataFrame()
+
     combined = pd.concat(rows, keys=row_labels, axis=0)
     final = combined.unstack(level=1)
-    final.columns.names = [None, None]
+
+    # Opcjonalnie: Zamiana kolejności poziomów kolumn, aby grupować po Fee
+    # final = final.swaplevel(0, 1, axis=1).sort_index(axis=1)
+
+    final.columns.names = ["Metric", "Fee Scenario"]
+    final.index.name = "Pair"
+
     return final
 
 
-def get_pair_data(portfolio_data: PortfolioData, x_asset: str, y_asset: str) -> Optional[PairData]:
+def get_pair_data(portfolio_data: Portfolio, x_asset: str, y_asset: str) -> Optional[Pair]:
     matching_pairs = [pair for pair in portfolio_data.pairs_data if pair.x == x_asset and pair.y == y_asset]
     if matching_pairs:
         return matching_pairs[0]

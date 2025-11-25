@@ -2,7 +2,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from modules.data_services.data_models import PairData, PortfolioData
+from modules.data_services.data_models import Pair, Portfolio
 from modules.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +16,7 @@ def _resolve_results_dir(directory: str | None) -> Path:
     return base
 
 
-def plot_prices(pair_data: PairData, directory: str | None = None,
+def plot_prices(pair_data: Pair, directory: str | None = None,
                 label: str = "prices", save: bool = True, show: bool = False) -> None:
     x, y = pair_data.x, pair_data.y
     start = pair_data.start
@@ -43,12 +43,12 @@ def plot_prices(pair_data: PairData, directory: str | None = None,
     plt.close()
 
 
-def plot_zscore(pair_data: PairData, directory: str | None = None,
+def plot_zscore(pair_data: Pair, directory: str | None = None,
                 thresholds: bool = False, save: bool = True, show: bool = False) -> None:
     x, y = pair_data.x, pair_data.y
     start, end = pair_data.start, pair_data.end
     interval = pair_data.interval
-    df = pair_data.data.dropna()
+    df = pair_data.data
     results_dir = _resolve_results_dir(directory)
 
     plt.figure(figsize=(12, 6))
@@ -80,10 +80,10 @@ def plot_zscore(pair_data: PairData, directory: str | None = None,
     plt.close()
 
 
-def plot_positions(pair_data: PairData, directory: str | None = None,
+def plot_positions(pair_data: Pair, directory: str | None = None,
                    save: bool = True, show: bool = False) -> None:
     x, y, start, end, interval = pair_data.x, pair_data.y, pair_data.start, pair_data.end, pair_data.interval
-    df = pair_data.data.dropna()
+    df = pair_data.data
     results_dir = _resolve_results_dir(directory)
 
     fig, ax = plt.subplots(figsize=(12, 3))
@@ -108,15 +108,15 @@ def plot_positions(pair_data: PairData, directory: str | None = None,
     plt.close()
 
 
-def plot_pnl(pair_data: PairData, directory: str | None = None,
+def plot_pnl(pair_data: Pair, directory: str | None = None,
              save: bool = True, show: bool = False) -> None:
     x, y, start, end, interval = pair_data.x, pair_data.y, pair_data.start, pair_data.end, pair_data.interval
     fee_rate = pair_data.fee_rate
-    df = pair_data.data.dropna()
+    df = pair_data.data
     results_dir = _resolve_results_dir(directory)
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax1.plot(df.index, df['pnl_pct'], label='Total Return [%] (Gross)', linewidth=1.6)
+    ax1.plot(df.index, df['total_pnl_pct'], label='Total Return [%] (Gross)', linewidth=1.6)
     ax1.plot(df.index, df['net_pnl_pct'], label=f'Total Return [%] (Net, fee: {fee_rate * 100}%)',
              linewidth=1.6, linestyle='--')
     ax1.set_xlabel('Date')
@@ -138,12 +138,12 @@ def plot_pnl(pair_data: PairData, directory: str | None = None,
     plt.close()
 
 
-def plot_zscore_with_positions(pair_data: PairData, directory: str | None = None,
+def plot_zscore_with_positions(pair_data: Pair, directory: str | None = None,
                                thresholds: bool = False, save: bool = True, show: bool = False) -> None:
     x, y = pair_data.x, pair_data.y
     start, end = pair_data.start, pair_data.end
     interval = pair_data.interval
-    df = pair_data.data.dropna()
+    df = pair_data.data
     results_dir = _resolve_results_dir(directory)
 
     fig, (ax1, ax2) = plt.subplots(
@@ -187,11 +187,11 @@ def plot_zscore_with_positions(pair_data: PairData, directory: str | None = None
     plt.close()
 
 
-def plot_summary_pnl(portfolio_data: PortfolioData, directory: str | None = None,
+def plot_summary_pnl(portfolio_data: Portfolio, directory: str | None = None,
                      save: bool = True, show: bool = False) -> None:
     start, end, interval = portfolio_data.start, portfolio_data.end, portfolio_data.interval
     fee_rate = portfolio_data.fee_rate
-    df = portfolio_data.data.dropna()
+    df = portfolio_data.data
     results_dir = _resolve_results_dir(directory)
 
     fig, ax1 = plt.subplots(figsize=(12, 6))

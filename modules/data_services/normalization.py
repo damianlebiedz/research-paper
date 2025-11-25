@@ -9,7 +9,7 @@ def cumulative_returns_index(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# def minmax_scale(pair_data: PairData) -> PairData:
+# def minmax_scale(pair_data: Pair) -> Pair:
 #     """Scale prices to range [0, 1]."""
 #     df = pair_data.data.copy()
 #
