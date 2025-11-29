@@ -8,3 +8,4 @@ seaborn~=0.13.2
 matplotlib~=3.10.7
 statsmodels~=0.14.5
 scikit-optimize~=0.10.2
+scipy~=1.16.2
