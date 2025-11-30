@@ -44,7 +44,7 @@ def plot_prices(pair_data: Pair, directory: str | None = None,
 
 
 def plot_zscore(pair_data: Pair, directory: str | None = None,
-                thresholds: bool = False, save: bool = True, show: bool = False) -> None:
+                thresholds: bool = False, save: bool = False, show: bool = True) -> None:
     x, y = pair_data.x, pair_data.y
     start, end = pair_data.start, pair_data.end
     interval = pair_data.interval
@@ -53,7 +53,16 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
 
     plt.figure(figsize=(12, 6))
     sns.lineplot(x=df.index, y=df["z_score"], color="grey")
-    label = ""
+
+    if df["z_score_virtual"]:
+        plt.plot(
+            df.index,
+            df["z_score_virtual"].astype(float),
+            color="green",
+            label="z_score_virtual"
+        )
+        label = ""
+
     if thresholds:
         label = "with_thr_"
         plt.plot(df.index, df['entry_threshold'], color="red", linestyle="--", label="short leg")
@@ -67,9 +76,9 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
     plt.grid(True, alpha=0.3)
     plt.xticks(rotation=45, ha='right')
     plt.xlim(df.index.min(), df.index.max())
+
     if thresholds:
         plt.legend(loc="lower right", fontsize="small")
-
     if save:
         filename = f"{x}_{y}_zscore_{label}{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename

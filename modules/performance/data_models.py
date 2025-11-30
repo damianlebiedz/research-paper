@@ -47,7 +47,6 @@ class PositionState:
 
     def clear_position(self):
         self.position = 0
-        self.prev_position = 0
         self.q_x = 0
         self.q_y = 0
         self.w_x = None
