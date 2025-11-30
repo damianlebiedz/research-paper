@@ -1,6 +1,8 @@
 import math
 from datetime import datetime, timedelta
 from typing import Optional
+
+import numpy as np
 import pandas as pd
 
 from modules.data_services.data_models import Portfolio, Pair
@@ -75,3 +77,18 @@ def get_pair_data(portfolio_data: Portfolio, x_asset: str, y_asset: str) -> Opti
         return matching_pairs[0]
     else:
         return None
+
+
+def add_returns(pair: Pair) -> Pair:
+    data = pair.data.copy()
+    col_x = pair.x
+    col_y = pair.y
+
+    data[f"{col_x}_returns"] = data[col_x].pct_change()
+    data[f"{col_y}_returns"] = data[col_y].pct_change()
+
+    data[f"{col_x}_log_returns"] = np.log(data[col_x] / data[col_x].shift(1))
+    data[f"{col_y}_log_returns"] = np.log(data[col_y] / data[col_y].shift(1))
+
+    pair.data = data.dropna()
+    return pair

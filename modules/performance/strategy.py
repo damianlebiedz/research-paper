@@ -33,7 +33,8 @@ def get_spread(x: str, y: str, position: float) -> tuple[float, float]:  # TODO
 
 
 def generate_trade(x: str, y: str, position_state: PositionState, strategy_params: StrategyParams, price_x: float,
-                   price_y: float, total_fees: float, is_spread: bool) -> tuple[float, float]:
+                   price_y: float, total_fees: float, is_spread: bool, norm_x: float, norm_y: float) -> tuple[float, float]:
+
     z_score = position_state.z_score
     alpha = position_state.alpha
     beta = position_state.beta
@@ -49,14 +50,21 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
     initial_cash = strategy_params.initial_cash
 
     def generate_virtual_z_score() -> tuple[Optional[float], float]:
-        s_virt = price_x - (alpha + beta * price_y)
+        s_virt = norm_x - (alpha + beta * norm_y)
         if position_state.std != 0:
             return (s_virt - mean) / std, s_virt
         return None, s_virt
 
     def open_position() -> tuple[float, float, float, float, float, float, float]:
-        wx = 1 / (beta + 1)
-        wy = 1 - wx
+        if norm_x == price_x and norm_y == price_y:
+            # Z-Score from raw prices
+            wx = 1 / (beta + 1)
+            wy = 1 - wx
+        else:
+            # Z-Score from Returns or Log Returns
+            wx = (beta * price_y) / ((beta * price_y) + price_x)
+            wy = price_x / ((beta * price_y) + price_x)
+
         position_cash = abs(position_state.position) * initial_cash
         x_spread, y_spread = get_spread(x, y, position_state.position) if is_spread else 1, 1
 
@@ -121,7 +129,8 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
         # OPEN POSITION
         if position_state.position != 0:
             q_x, q_y, w_x, w_y, entry_val, stop_loss_threshold, total_fees = open_position()
-            position_state.update_position(position_state.position, prev_position, q_x, q_y, w_x, w_y, entry_val, stop_loss_threshold)
+            position_state.update_position(position_state.position, prev_position, q_x, q_y, w_x, w_y, entry_val,
+                                           stop_loss_threshold)
             pnl = 0
 
         # STAY OUT OF POSITION
@@ -131,7 +140,12 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
     return pnl, total_fees
 
 
-def calculate_rolling_zscore(col_x, col_y, df: pd.DataFrame):
+def calculate_rolling_zscore(col_x, col_y, df: pd.DataFrame) -> tuple[
+    Optional[float], float, float, float, float, float]:
+
+    df[col_x].dropna()
+    df[col_y].dropna()
+
     X = sm.add_constant(df[col_y])
     y = df[col_x]
 
@@ -153,7 +167,7 @@ def calculate_rolling_zscore(col_x, col_y, df: pd.DataFrame):
 
 def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None, exit_threshold: float = None,
                  stop_loss: float = None, pos_size: float = None, is_spread: bool = False,
-                 static_hedge: bool = True) -> Pair:
+                 static_hedge: bool = True, source: str = "prices") -> Pair:
     df = pair.data.copy()
     x_col, y_col = pair.x, pair.y
     initial_cash = pair.initial_cash
@@ -185,8 +199,20 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
                 exit_threshold = ...  # [-inf,+inf]
                 stop_loss = ...  # > entry_threshold
 
+            if source == "prices":
+                norm_x = x_col
+                norm_y = y_col
+            elif source == "returns":
+                norm_x = f"{x_col}_returns"
+                norm_y = f"{y_col}_returns"
+            elif source == "log_returns":
+                norm_x = f"{x_col}_log_returns"
+                norm_y = f"{y_col}_log_returns"
+            else:
+                raise ValueError("Source must be 'prices', 'returns', or 'log_returns'")
+
             z_score, spread, alpha, beta, mean, std = calculate_rolling_zscore(
-                x_col, y_col, df.iloc[i - rolling_window + 1:i + 1])
+                norm_x, norm_y, df.iloc[i - rolling_window + 1:i + 1])
 
             signal = generate_signal(entry_threshold, z_score)
 
@@ -200,15 +226,18 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
                     position_state.position = signal * pos_size
                     position_state.update_hedge_if_none(z_score, spread, alpha, beta, mean, std)
             else:
-                position_state.position = signal * pos_size
                 position_state.update_hedge_if_none(z_score, spread, alpha, beta, mean, std)
+                if beta >= 0:
+                    position_state.position = signal * pos_size
 
             strategy_params.exit_threshold = exit_threshold
             strategy_params.stop_loss = stop_loss
             strategy_params.pos_size = pos_size
 
             pnl, total_fees = generate_trade(
-                x_col, y_col, position_state, strategy_params, price_x, price_y, total_fees, is_spread)
+                x_col, y_col, position_state, strategy_params, price_x, price_y, total_fees,
+                is_spread, df[norm_x].iloc[i], df[norm_y].iloc[i]
+            )
 
             if pnl != 0:
                 total_pnl = pnl + prev_pnl
