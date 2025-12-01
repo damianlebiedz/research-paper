@@ -33,8 +33,8 @@ def get_spread(x: str, y: str, position: float) -> tuple[float, float]:  # TODO
 
 
 def generate_trade(x: str, y: str, position_state: PositionState, strategy_params: StrategyParams, price_x: float,
-                   price_y: float, total_fees: float, is_spread: bool, norm_x: float, norm_y: float) -> tuple[float, float]:
-
+                   price_y: float, total_fees: float, is_spread: bool, norm_x: float, norm_y: float) -> tuple[
+    float, float]:
     z_score = position_state.z_score
     alpha = position_state.alpha
     beta = position_state.beta
@@ -56,14 +56,8 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
         return None, s_virt
 
     def open_position() -> tuple[float, float, float, float, float, float, float]:
-        if norm_x == price_x and norm_y == price_y:
-            # Z-Score from raw prices
-            wx = 1 / (beta + 1)
-            wy = 1 - wx
-        else:
-            # Z-Score from Returns or Log Returns
-            wx = (beta * price_y) / ((beta * price_y) + price_x)
-            wy = price_x / ((beta * price_y) + price_x)
+        wx = 1 / (beta + 1)
+        wy = 1 - wx
 
         position_cash = abs(position_state.position) * initial_cash
         x_spread, y_spread = get_spread(x, y, position_state.position) if is_spread else 1, 1
@@ -142,7 +136,6 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
 
 def calculate_rolling_zscore(col_x, col_y, df: pd.DataFrame) -> tuple[
     Optional[float], float, float, float, float, float]:
-
     df[col_x].dropna()
     df[col_y].dropna()
 
@@ -199,6 +192,10 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
                 exit_threshold = ...  # [-inf,+inf]
                 stop_loss = ...  # > entry_threshold
 
+            strategy_params.entry_threshold = entry_threshold
+            strategy_params.exit_threshold = exit_threshold
+            strategy_params.stop_loss = stop_loss
+
             if source == "prices":
                 norm_x = x_col
                 norm_y = y_col
@@ -230,8 +227,6 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
                 if beta >= 0:
                     position_state.position = signal * pos_size
 
-            strategy_params.exit_threshold = exit_threshold
-            strategy_params.stop_loss = stop_loss
             strategy_params.pos_size = pos_size
 
             pnl, total_fees = generate_trade(
@@ -250,29 +245,31 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
         idx = df.index[i]
         df.at[idx, 'z_score'] = z_score
         # df.at[idx, 'spread'] = spread
-        df.at[idx, 'alpha'] = alpha
+        # df.at[idx, 'alpha'] = alpha
         df.at[idx, 'beta'] = beta
-        df.at[idx, 'mean'] = mean
-        df.at[idx, 'std'] = std
+        # df.at[idx, 'mean'] = mean
+        # df.at[idx, 'std'] = std
         if static_hedge:
             df.at[idx, 'z_score_virtual'] = position_state.z_score
             # df.at[idx, 'spread_virt'] = position_state.spread
-            df.at[idx, 'alpha_pos'] = position_state.alpha
-            df.at[idx, 'beta_pos'] = position_state.beta
-            df.at[idx, 'mean_pos'] = position_state.mean
-            df.at[idx, 'std_pos'] = position_state.std
-        df.at[idx, 'stop_loss_threshold'] = position_state.stop_loss_threshold
-        df.at[idx, 'weight_x'] = position_state.w_x
-        df.at[idx, 'weight_y'] = position_state.w_y
+            # df.at[idx, 'alpha_pos'] = position_state.alpha
+            # df.at[idx, 'beta_pos'] = position_state.beta
+            # df.at[idx, 'mean_pos'] = position_state.mean
+            # df.at[idx, 'std_pos'] = position_state.std
+        df.at[idx, 'entry_thr'] = strategy_params.entry_threshold
+        df.at[idx, 'exit_thr'] = strategy_params.exit_threshold
+        df.at[idx, 'sl_thr'] = position_state.stop_loss_threshold
+        df.at[idx, 'w_x'] = position_state.w_x
+        df.at[idx, 'w_y'] = position_state.w_y
         df.at[idx, 'q_x'] = position_state.q_x
         df.at[idx, 'q_y'] = position_state.q_y
-        df.at[idx, 'cash'] = initial_cash - position_state.entry_val
-        df.at[idx, 'signal'] = signal
+        # df.at[idx, 'cash'] = initial_cash - position_state.entry_val
+        # df.at[idx, 'signal'] = signal
         df.at[idx, 'position'] = position_state.position
         # df.at[idx, 'prev_position'] = position_state.prev_position
-        df.at[idx, 'total_pnl'] = total_pnl
+        df.at[idx, 'total_return'] = total_pnl
         df.at[idx, 'total_fees'] = total_fees
-        df.at[idx, 'net_pnl'] = total_pnl - total_fees
+        df.at[idx, 'net_return'] = total_pnl - total_fees
 
         if static_hedge:
             if position_state.position == 0 and prev_pos != 0:
@@ -281,10 +278,11 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
             position_state.clear_hedge()
         position_state.prev_position = position_state.position
 
-    df['total_pnl_pct'] = df['total_pnl'] / initial_cash
-    df['net_pnl_pct'] = df['net_pnl'] / initial_cash
+    df['total_return_pct'] = df['total_return'] / initial_cash
+    df['net_return_pct'] = df['net_return'] / initial_cash
 
-    pair.data = df[rolling_window - 1:]
+    pair.data = df[rolling_window - 1:].drop(
+        columns=[f'{x_col}_returns', f'{y_col}_returns', f'{x_col}_log_returns', f'{y_col}_log_returns']).round(4)
     return pair
 
 
@@ -412,8 +410,8 @@ def calculate_stats(pair: Pair) -> pd.DataFrame:
             "downside_sqn": downside_sqn,
         }
 
-    brutto_stats = compute_stats(df["total_pnl"])
-    netto_stats = compute_stats(df["net_pnl"])
+    brutto_stats = compute_stats(df["total_return"])
+    netto_stats = compute_stats(df["net_return"])
 
     metrics_order = [
         "total_return", "cagr", "volatility", "volatility_annual", "max_drawdown", "win_count", "lose_count",

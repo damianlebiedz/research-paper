@@ -2,7 +2,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from modules.data_services.data_models import Pair, Portfolio
+from modules.data_services.data_models import Pair
 from modules.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,15 +31,28 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
         plt.plot(
             df.index,
             df["z_score_virtual"].astype(float),
-            color="green",
+            color="blue",
             label="z_score_virtual"
         )
 
-    if thresholds:
-        plt.plot(df.index, df['entry_threshold'], color="red", linestyle="--", label="short leg")
-        plt.plot(df.index, -df['entry_threshold'], color="green", linestyle="--", label="long leg")
-        plt.plot(df.index, df['exit_threshold'], color="black", linestyle="--", label="take profit")
-        plt.plot(df.index, -df['exit_threshold'], color="black", linestyle="--")
+    plt.plot(
+        df.index,
+        df["entry_thr"].astype(float),
+        color="red",
+        label="entry_thr"
+    )
+    plt.plot(
+        df.index,
+        -df["entry_thr"].astype(float),
+        color="red",
+    )
+
+    plt.plot(
+        df.index,
+        df["exit_thr"].astype(float),
+        color="green",
+        label="exit_thr"
+    )
 
     plt.title(f"Z-Score: {x}/{y}")
     plt.ylabel("Z-Score")
@@ -47,6 +60,7 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
     plt.grid(True, alpha=0.3)
     plt.xticks(rotation=45, ha='right')
     plt.xlim(df.index.min(), df.index.max())
+    plt.legend()
 
     if thresholds:
         plt.legend(loc="lower right", fontsize="small")
@@ -96,11 +110,11 @@ def plot_pnl(pair_data: Pair, directory: str | None = None,
     results_dir = _resolve_results_dir(directory)
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax1.plot(df.index, df['total_pnl_pct'], label='Total Return [%] (Gross)', linewidth=1.6)
-    ax1.plot(df.index, df['net_pnl_pct'], label=f'Total Return [%] (Net, fee: {fee_rate * 100}%)',
+    ax1.plot(df.index, df['total_return_pct'], label='Total Return [%] (Gross)', linewidth=1.6)
+    ax1.plot(df.index, df['net_return_pct'], label=f'Total Return [%] (Net, fee: {fee_rate * 100}%)',
              linewidth=1.6, linestyle='--')
     ax1.set_xlabel('Date')
-    ax1.set_ylabel('PnL%', color='black')
+    ax1.set_ylabel('Return%', color='black')
     ax1.tick_params(axis='y', labelcolor='black')
     plt.grid(True, alpha=0.3)
     plt.xticks(rotation=45, ha='right')
@@ -109,7 +123,7 @@ def plot_pnl(pair_data: Pair, directory: str | None = None,
     ax1.set_title(f'Total Return [%]: {x}/{y}')
 
     if save:
-        filename = f"{x}_{y}_pnl_{start}_{end}_{interval}.png".replace(":", "-")
+        filename = f"{x}_{y}_return_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
         logger.debug(f"Saved plot: {save_path}")

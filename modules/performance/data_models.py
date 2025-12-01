@@ -57,6 +57,7 @@ class PositionState:
 
 @dataclass
 class StrategyParams:
+    entry_threshold: float
     exit_threshold: float
     stop_loss: float
     fee_rate: float

@@ -34,7 +34,7 @@ def pre_training_start(start: str, interval: str, rolling_window_steps: float) -
     steps_per_day = get_steps(interval)
     days = math.ceil(rolling_window_steps / steps_per_day)
     date_object = datetime.strptime(start, "%Y-%m-%d")
-    new_date_object = date_object - timedelta(days=days)
+    new_date_object = date_object - timedelta(days=days + 1)
     return new_date_object.strftime("%Y-%m-%d")
 
 
@@ -79,7 +79,7 @@ def get_pair_data(portfolio_data: Portfolio, x_asset: str, y_asset: str) -> Opti
         return None
 
 
-def add_returns(pair: Pair) -> Pair:
+def add_returns(pair: Pair) -> None:
     data = pair.data.copy()
     col_x = pair.x
     col_y = pair.y
@@ -91,4 +91,3 @@ def add_returns(pair: Pair) -> Pair:
     data[f"{col_y}_log_returns"] = np.log(data[col_y] / data[col_y].shift(1))
 
     pair.data = data.dropna()
-    return pair
