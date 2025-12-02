@@ -81,14 +81,14 @@ def fetch_data_from_binance(symbol: str, interval: str, start_str: str, end_str:
 
 
 if __name__ == "__main__":
-    tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "DOTUSDT", "LINKUSDT",
-               "TRXUSDT", "LTCUSDT", "SHIBUSDT", "ICPUSDT", "BCHUSDT"]
+    tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "TRXUSDT", "DOTUSDT",
+               "LINKUSDT", "SHIBUSDT", "LTCUSDT", "BCHUSDT", "UNIUSDT"]
 
     for ticker in tickers:
         fetch_data_from_binance(
             symbol=ticker,
-            interval="1d",
+            interval="1m",
             start_str="01.01.2024",
-            end_str="01.01.2025",
+            end_str="01.11.2025",
             date_format="%d.%m.%Y",
         )

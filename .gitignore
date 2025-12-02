@@ -3,6 +3,7 @@ __pycache__
 
 data/*
 !data/.ignore
+!data/asset_list.xlsm
 
 results/*
 !results/.ignore
