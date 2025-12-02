@@ -1,11 +1,15 @@
+from functools import partial
 from typing import Optional
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy.stats import linregress
+from skopt.space import Integer, Real
 
+from modules.data_services.data_loaders import load_pair
 from modules.data_services.data_models import Pair
-from modules.data_services.data_utils import get_steps
+from modules.data_services.data_utils import get_steps, pre_training_start, add_returns
+from modules.data_services.param_optimization import bayesian_optimization
 from modules.performance.data_models import PositionState, StrategyParams
 
 
@@ -33,10 +37,8 @@ def get_spread(x: str, y: str, position: float) -> tuple[float, float]:  # TODO
 
 
 def generate_trade(x: str, y: str, position_state: PositionState, strategy_params: StrategyParams, price_x: float,
-                   price_y: float, total_fees: float, is_spread: bool, norm_x: float, norm_y: float) -> tuple[
-    float, float]:
+                   price_y: float, total_fees: float, is_spread: bool) -> tuple[float, float]:
     z_score = position_state.z_score
-    alpha = position_state.alpha
     beta = position_state.beta
     mean = position_state.mean
     std = position_state.std
@@ -50,7 +52,7 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
     initial_cash = strategy_params.initial_cash
 
     def generate_virtual_z_score() -> tuple[Optional[float], float]:
-        s_virt = norm_x - (alpha + beta * norm_y)
+        s_virt = price_x - (beta * price_y)
         if position_state.std != 0:
             return (s_virt - mean) / std, s_virt
         return None, s_virt
@@ -95,7 +97,6 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
         z_score_virt, spread_virt = generate_virtual_z_score()
         position_state.z_score = z_score_virt
         position_state.spread = spread_virt
-
         # CLOSE POSITION (STOP LOSS OR TAKE PROFIT)
         if (
                 prev_position < 0 and (
@@ -107,7 +108,6 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
         ):
             pnl, total_fees = close_position()
             position_state.clear_position()
-
         # STAY IN POSITION
         else:
             exit_val = abs(q_x) * price_x + abs(q_y) * price_y
@@ -116,51 +116,45 @@ def generate_trade(x: str, y: str, position_state: PositionState, strategy_param
             else:
                 pnl = position_state.entry_val - exit_val
             position_state.position = prev_position
-
     # OUT OF POSITION
     else:
-
         # OPEN POSITION
         if position_state.position != 0:
             q_x, q_y, w_x, w_y, entry_val, stop_loss_threshold, total_fees = open_position()
             position_state.update_position(position_state.position, prev_position, q_x, q_y, w_x, w_y, entry_val,
                                            stop_loss_threshold)
             pnl = 0
-
         # STAY OUT OF POSITION
         else:
             pnl = 0
-
     return pnl, total_fees
 
 
-def calculate_rolling_zscore(col_x, col_y, df: pd.DataFrame) -> tuple[
-    Optional[float], float, float, float, float, float]:
-    df[col_x].dropna()
-    df[col_y].dropna()
+def calculate_beta_returns(x_returns: str, y_returns: str, df: pd.DataFrame) -> float:
+    X = sm.add_constant(df[y_returns])
+    y = df[x_returns]
 
-    X = sm.add_constant(df[col_y])
-    y = df[col_x]
+    model = sm.OLS(y, X, missing="drop").fit()
+    beta = model.params[y_returns]
 
-    model = sm.OLS(y, X, missing='drop').fit()
-    alpha = model.params['const']
-    beta = model.params[col_y]
+    return beta
 
-    spread_col = df[col_x] - (alpha + beta * df[col_y])
-    mean = spread_col.mean()
-    std = spread_col.std()
-    spread = (spread_col.iloc[-1])
 
+def calculate_zscore_prices(x_price: str, y_price: str, beta: float, df: pd.DataFrame) \
+        -> tuple[float, float, float, float]:
+    spread_series = df[x_price] - (beta * df[y_price])
+    mean = spread_series.mean()
+    std = spread_series.std()
+    spread = spread_series.iloc[-1]
     if std == 0:
-        return None, spread, alpha, beta, mean, std
-
-    z_score = (spread - mean) / std
-    return z_score, spread, alpha, beta, mean, std
+        return None, spread, mean, std
+    z = (spread - mean) / std
+    return z, spread, mean, std
 
 
 def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None, exit_threshold: float = None,
                  stop_loss: float = None, pos_size: float = None, is_spread: bool = False,
-                 static_hedge: bool = True, source: str = "prices") -> Pair:
+                 static_hedge: bool = True) -> Pair:
     df = pair.data.copy()
     x_col, y_col = pair.x, pair.y
     initial_cash = pair.initial_cash
@@ -196,20 +190,13 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
             strategy_params.exit_threshold = exit_threshold
             strategy_params.stop_loss = stop_loss
 
-            if source == "prices":
-                norm_x = x_col
-                norm_y = y_col
-            elif source == "returns":
-                norm_x = f"{x_col}_returns"
-                norm_y = f"{y_col}_returns"
-            elif source == "log_returns":
-                norm_x = f"{x_col}_log_returns"
-                norm_y = f"{y_col}_log_returns"
-            else:
-                raise ValueError("Source must be 'prices', 'returns', or 'log_returns'")
+            beta = calculate_beta_returns(
+                f"{x_col}_returns", f"{y_col}_returns", df.iloc[i - rolling_window + 1:i + 1]
+            )
 
-            z_score, spread, alpha, beta, mean, std = calculate_rolling_zscore(
-                norm_x, norm_y, df.iloc[i - rolling_window + 1:i + 1])
+            z_score, spread, mean, std = calculate_zscore_prices(
+                x_col, y_col, beta, df.iloc[i - rolling_window + 1:i + 1]
+            )
 
             signal = generate_signal(entry_threshold, z_score)
 
@@ -221,17 +208,16 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
             if static_hedge:
                 if prev_pos == 0 and signal != 0 and beta >= 0:
                     position_state.position = signal * pos_size
-                    position_state.update_hedge_if_none(z_score, spread, alpha, beta, mean, std)
+                    position_state.update_hedge_if_none(z_score, spread,beta, mean, std)
             else:
-                position_state.update_hedge_if_none(z_score, spread, alpha, beta, mean, std)
+                position_state.update_hedge_if_none(z_score, spread, beta, mean, std)
                 if beta >= 0:
                     position_state.position = signal * pos_size
 
             strategy_params.pos_size = pos_size
 
             pnl, total_fees = generate_trade(
-                x_col, y_col, position_state, strategy_params, price_x, price_y, total_fees,
-                is_spread, df[norm_x].iloc[i], df[norm_y].iloc[i]
+                x_col, y_col, position_state, strategy_params, price_x, price_y, total_fees, is_spread
             )
 
             if pnl != 0:
@@ -245,14 +231,12 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
         idx = df.index[i]
         df.at[idx, 'z_score'] = z_score
         # df.at[idx, 'spread'] = spread
-        # df.at[idx, 'alpha'] = alpha
         df.at[idx, 'beta'] = beta
         # df.at[idx, 'mean'] = mean
         # df.at[idx, 'std'] = std
         if static_hedge:
             df.at[idx, 'z_score_virtual'] = position_state.z_score
             # df.at[idx, 'spread_virt'] = position_state.spread
-            # df.at[idx, 'alpha_pos'] = position_state.alpha
             # df.at[idx, 'beta_pos'] = position_state.beta
             # df.at[idx, 'mean_pos'] = position_state.mean
             # df.at[idx, 'std_pos'] = position_state.std
@@ -428,6 +412,75 @@ def calculate_stats(pair: Pair) -> pd.DataFrame:
 
     stats_df = stats_df.round(4)
     return stats_df
+
+
+def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold: float, stop_loss: float,
+                     ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
+                     trading_start: str, trading_end: str, interval: str, metric: tuple, is_spread: bool,
+                     static_hedge: bool):
+    try:
+        pt_start = pre_training_start(start=trading_start, interval=interval, rolling_window_steps=rolling_window)
+        pair = load_pair(x=ticker_x, y=ticker_y, start=pt_start, end=trading_end, interval=interval)
+        add_returns(pair)
+
+        pair.fee_rate = fee_rate
+        pair.initial_cash = initial_cash
+
+        run_strategy(pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, is_spread,
+                     static_hedge)
+
+        pair.stats = calculate_stats(pair)
+        score = pair.stats.loc[metric]
+
+        if isinstance(score, pd.Series):
+            score = score.iloc[0]
+        if pd.isna(score):
+            return 0.0
+        return score
+
+    except Exception as e:
+        print("Error in strategy run:", e)
+        return -1.0
+
+
+def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
+                         training_start: str, training_end: str, interval: str, is_spread: bool, static_hedge: bool,
+                         metric: tuple = ("sortino_ratio_annual", "0.05% fee")) -> tuple[dict, float]:
+    param_space = [
+        Integer(2, 700, name="rolling_window"),
+        Real(1.0, 6.0, name="entry_threshold"),
+        Real(0.0, 1.0, name="exit_threshold"),
+        Real(1.0, 3.0, name="stop_loss"),
+    ]
+
+    static_params = {
+        "ticker_x": ticker_x,
+        "ticker_y": ticker_y,
+        "fee_rate": fee_rate,
+        "initial_cash": initial_cash,
+        "position_size": position_size,
+        "trading_start": training_start,
+        "trading_end": training_end,
+        "interval": interval,
+    }
+
+    wrapped_strategy = partial(
+        strategy_wrapper,
+        is_spread=is_spread,
+        static_hedge=static_hedge,
+    )
+
+    best_params, best_score, results = bayesian_optimization(
+        strategy_func=wrapped_strategy,
+        param_space=param_space,
+        static_params=static_params,
+        metric=metric,
+        # n_calls=50,
+        # random_state=0,
+        minimize=False,
+    )
+
+    return best_params, best_score
 
 # def run_strategy(pairs: list[str], trading_start: str, trading_end: str, interval: str,
 #                  window_in_steps: int, z_score_method: str, entry_threshold: float = None, exit_threshold: float = None,

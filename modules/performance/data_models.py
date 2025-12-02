@@ -5,7 +5,6 @@ from dataclasses import dataclass
 class PositionState:
     z_score: float = None
     spread: float = None
-    alpha: float = None
     beta: float = None
     mean: float = None
     std: float = None
@@ -19,10 +18,9 @@ class PositionState:
     entry_val: float = 0
     stop_loss_threshold: float = None
 
-    def update_hedge_if_none(self, z_score, spread, alpha, beta, mean, std):
+    def update_hedge_if_none(self, z_score, spread, beta, mean, std):
         if self.z_score is None: self.z_score = z_score
         if self.spread is None: self.spread = spread
-        if self.alpha is None: self.alpha = alpha
         if self.beta is None: self.beta = beta
         if self.mean is None: self.mean = mean
         if self.std is None: self.std = std
@@ -40,7 +38,6 @@ class PositionState:
     def clear_hedge(self):
         self.z_score = None
         self.spread = None
-        self.alpha = None
         self.beta = None
         self.mean = None
         self.std = None

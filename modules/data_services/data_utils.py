@@ -1,7 +1,7 @@
 import math
 from datetime import datetime, timedelta
+from functools import reduce
 from typing import Optional
-
 import numpy as np
 import pandas as pd
 
@@ -79,6 +79,15 @@ def get_pair_data(portfolio_data: Portfolio, x_asset: str, y_asset: str) -> Opti
         return None
 
 
+def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:
+    trimmed = []
+    for df, cols in zip(dfs, keep_cols):
+        trimmed.append(df[['pair'] + cols])
+
+    merged = reduce(lambda left, right: pd.merge(left, right, on='pair', how='outer'), trimmed)
+    return merged
+
+
 def add_returns(pair: Pair) -> None:
     data = pair.data.copy()
     col_x = pair.x
@@ -91,3 +100,25 @@ def add_returns(pair: Pair) -> None:
     data[f"{col_y}_log_returns"] = np.log(data[col_y] / data[col_y].shift(1))
 
     pair.data = data.dropna()
+
+
+def cumulative_returns_index(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize prices with cumulative returns to start from 1."""
+    df = df.copy()
+    for column in df.columns:
+        df[column] = (1 + df[column].pct_change().fillna(0)).cumprod()
+    return df
+
+
+def minmax_scale(pair_data: Pair) -> Pair:
+    """Scale prices to range [0, 1]."""
+    df = pair_data.data.copy()
+
+    def minmax_scale_series(series: pd.Series) -> pd.Series:
+        """Scale a series to range [0, 1]."""
+        return (series - series.min()) / (series.max() - series.min())
+
+    df[f"{pair_data.x}_scaled"] = minmax_scale_series(df[pair_data.x])
+    df[f"{pair_data.y}_scaled"] = minmax_scale_series(df[pair_data.y])
+    pair_data.data = df
+    return pair_data
