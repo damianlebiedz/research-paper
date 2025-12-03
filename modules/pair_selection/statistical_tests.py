@@ -4,10 +4,10 @@ import pandas as pd
 from statsmodels.tsa.stattools import coint
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
-from modules.data_services.normalization import cumulative_returns_index
+from modules.data_services.data_utils import cumulative_returns_index
 
 
-def sum_of_standard_deviation(df: pd.DataFrame) -> pd.DataFrame:
+def ssd_cumulative_returns(df: pd.DataFrame) -> pd.DataFrame:
     df_cum_returns = cumulative_returns_index(df)
     results = []
 
@@ -27,7 +27,7 @@ def pearson_correlation(df: pd.DataFrame, source: str = "prices") -> pd.DataFram
     elif source == "log_returns":
         df_clean = np.log(df_clean / df_clean.shift(1)).dropna()
     elif source != "prices":
-        raise ValueError("source must be one of ['price', 'return', 'log_return']")
+        raise ValueError("source must be one of ['prices', 'returns', 'log_returns']")
 
     corr_matrix = df_clean.corr(method='pearson')
     corr_df = (
@@ -79,24 +79,3 @@ def johansen_cointegration(df: pd.DataFrame, det_order: int = 0,
             'trace_stat - crit_99': trace_stat - crit_99,
         })
     return pd.DataFrame(results).sort_values(by='trace_stat - crit_95', ascending=False).reset_index(drop=True)
-
-
-def perform_statistical_tests(df: pd.DataFrame) -> pd.DataFrame:
-    corr_prices_df = pearson_correlation(df, source="prices")
-    corr_returns_df = pearson_correlation(df, source="returns")
-    corr_log_returns_df = pearson_correlation(df, source="log_returns")
-    eg_df = engle_granger_cointegration(df)
-    johansen_df = johansen_cointegration(df)
-
-    from modules.data_services.data_pipeline import merge_by_pair
-    merged_df = merge_by_pair(
-        dfs=[corr_prices_df, corr_returns_df, corr_log_returns_df, eg_df, johansen_df],
-        keep_cols=[
-            ['corr_prices'],
-            ['corr_returns'],
-            ['corr_log_returns'],
-            ['eg_p_value'],
-            ['trace_stat - crit_95']
-        ]
-    )
-    return merged_df

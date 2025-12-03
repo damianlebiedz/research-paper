@@ -2,6 +2,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+from modules.data_services.data_loaders import load_data
 from modules.data_services.data_models import Pair
 from modules.utils.logger import get_logger
 
@@ -54,6 +55,12 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
         label="exit_thr"
     )
 
+    plt.plot(
+        df.index,
+        -df["exit_thr"].astype(float),
+        color="green",
+    )
+
     plt.title(f"Z-Score: {x}/{y}")
     plt.ylabel("Z-Score")
     plt.xlabel("Date")
@@ -81,7 +88,7 @@ def plot_positions(pair_data: Pair, directory: str | None = None,
     results_dir = _resolve_results_dir(directory)
 
     fig, ax = plt.subplots(figsize=(12, 3))
-    ax.plot(df.index, df['position'], color='yellow', linewidth=1.6)
+    ax.plot(df.index, df['position'], color='black', linewidth=1.6)
     ax.set_ylabel('Position', color='black')
     ax.set_yticks([-1, 0, 1])
     ax.tick_params(axis='y', labelcolor='black')
@@ -103,7 +110,7 @@ def plot_positions(pair_data: Pair, directory: str | None = None,
 
 
 def plot_pnl(pair_data: Pair, directory: str | None = None,
-             save: bool = True, show: bool = False) -> None:
+             save: bool = True, show: bool = False, btc: bool = False) -> None:
     x, y, start, end, interval = pair_data.x, pair_data.y, pair_data.start, pair_data.end, pair_data.interval
     fee_rate = pair_data.fee_rate
     df = pair_data.data
@@ -114,10 +121,25 @@ def plot_pnl(pair_data: Pair, directory: str | None = None,
     ax1.plot(df.index, df['net_return_pct'], label=f'Total Return [%] (Net, fee: {fee_rate * 100}%)',
              linewidth=1.6, linestyle='--')
     ax1.set_xlabel('Date')
-    ax1.set_ylabel('Return%', color='black')
+    ax1.set_ylabel('Total Return [%]', color='black')
     ax1.tick_params(axis='y', labelcolor='black')
     plt.grid(True, alpha=0.3)
     plt.xticks(rotation=45, ha='right')
+
+    if btc:
+        btc_data = load_data(
+            tickers=['BTCUSDT'],
+            start=start,
+            end=end,
+            interval=interval,
+        )
+        btc_data['BTC_return'] = btc_data['BTCUSDT'].pct_change()
+        btc_data.loc[btc_data.index[0], 'BTC_return'] = 0.0
+        btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
+
+        ax1.plot(btc_data.index, btc_data['BTC_cum_return'], label=f'BTCUSDT total return',
+                 linewidth=1.4, linestyle='--', color='red')
+
     plt.xlim(df.index.min(), df.index.max())
     ax1.legend(loc='lower right', fontsize="small")
     ax1.set_title(f'Total Return [%]: {x}/{y}')

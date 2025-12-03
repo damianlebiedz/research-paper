@@ -1,4 +1,3 @@
-from functools import reduce
 from pathlib import Path
 import pandas as pd
 
@@ -54,12 +53,3 @@ def load_pair(x: str, y: str, start: str, end: str, interval: str, data_dir: str
         raise ValueError(f"No data available for tickers {[x, y]} in range {start} to {end}")
 
     return Pair(x=x, y=y, start=start, end=end, interval=interval, data=data)
-
-
-def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:
-    trimmed = []
-    for df, cols in zip(dfs, keep_cols):
-        trimmed.append(df[['pair'] + cols])
-
-    merged = reduce(lambda left, right: pd.merge(left, right, on='pair', how='outer'), trimmed)
-    return merged

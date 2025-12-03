@@ -3,16 +3,16 @@ from typing import Optional
 import pandas as pd
 
 
-@dataclass
-class Position:
-    start: str
-    end: str
-    beta: float
-    alpha: float
-    mean: float
-    std: float
-    w_x: float
-    w_y: float
+# @dataclass # TODO
+# class Position:
+#     start: str
+#     end: str
+#     beta: float
+#     alpha: float
+#     mean: float
+#     std: float
+#     w_x: float
+#     w_y: float
 
 
 @dataclass
@@ -24,8 +24,8 @@ class Pair:
     interval: str
     data: pd.DataFrame
     stats: Optional[pd.DataFrame] = None
-    fee_rate: float = 0 # TODO
-    initial_cash: float = 100000 # TODO
+    fee_rate: float = 0
+    initial_cash: float = 100000
     # positions: list[Position] = field(default_factory=list) # TODO
 
     def __getitem__(self, key):
