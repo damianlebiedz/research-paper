@@ -36,30 +36,10 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
             label="z_score_virtual"
         )
 
-    plt.plot(
-        df.index,
-        df["entry_thr"].astype(float),
-        color="red",
-        label="entry_thr"
-    )
-    plt.plot(
-        df.index,
-        -df["entry_thr"].astype(float),
-        color="red",
-    )
-
-    plt.plot(
-        df.index,
-        df["exit_thr"].astype(float),
-        color="green",
-        label="exit_thr"
-    )
-
-    plt.plot(
-        df.index,
-        -df["exit_thr"].astype(float),
-        color="green",
-    )
+    plt.plot(df.index, df["entry_thr"].astype(float), color="red", label="entry_thr")
+    plt.plot(df.index, -df["entry_thr"].astype(float), color="red")
+    plt.plot(df.index, df["exit_thr"].astype(float), color="green", label="exit_thr")
+    plt.plot(df.index, -df["exit_thr"].astype(float), color="green")
 
     plt.title(f"Z-Score: {x}/{y}")
     plt.ylabel("Z-Score")
@@ -152,33 +132,3 @@ def plot_pnl(pair_data: Pair, directory: str | None = None,
     if show:
         plt.show()
     plt.close()
-
-
-# def plot_summary_pnl(portfolio_data: Portfolio, directory: str | None = None,
-#                      save: bool = True, show: bool = False) -> None:
-#     start, end, interval = portfolio_data.start, portfolio_data.end, portfolio_data.interval
-#     fee_rate = portfolio_data.fee_rate
-#     df = portfolio_data.data
-#     results_dir = _resolve_results_dir(directory)
-#
-#     fig, ax1 = plt.subplots(figsize=(12, 6))
-#     ax1.plot(df.index, df['pnl_pct'], label='Total Return [%] (Gross)', linewidth=1.6)
-#     ax1.plot(df.index, df['net_pnl_pct'], label=f'Total Return [%] (Net, fee: {fee_rate * 100}%)',
-#              linewidth=1.6, linestyle='--')
-#     ax1.set_xlabel('Date')
-#     ax1.set_ylabel('PnL%', color='black')
-#     ax1.tick_params(axis='y', labelcolor='black')
-#     plt.grid(True, alpha=0.3)
-#     plt.xticks(rotation=45, ha='right')
-#     plt.xlim(df.index.min(), df.index.max())
-#     ax1.legend(loc='lower right', fontsize="small")
-#     ax1.set_title('Total Return [%] of portfolio')
-#
-#     if save:
-#         filename = f"portfolio_pnl_{start}_{end}_{interval}.png".replace(":", "-")
-#         save_path = results_dir / filename
-#         plt.savefig(save_path, dpi=150)
-#         logger.debug(f"Saved plot: {save_path}")
-#     if show:
-#         plt.show()
-#     plt.close()

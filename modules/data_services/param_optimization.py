@@ -9,7 +9,6 @@ def bayesian_optimization(
         static_params: dict,
         metric: tuple,
         n_calls: int = 100,
-        # n_initial_points: int = 30,
         random_state: int = 42,
         minimize: bool = False,
 ):
@@ -39,8 +38,6 @@ def bayesian_optimization(
         wrapped,
         param_space,
         n_calls=n_calls,
-        # n_initial_points=n_initial_points,
-        # acq_func="EI",
         random_state=random_state
     )
 
