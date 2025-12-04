@@ -1,8 +1,8 @@
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from modules.data_services.data_loaders import load_data
 from modules.data_services.data_models import Pair
 from modules.utils.logger import get_logger
 
@@ -89,36 +89,25 @@ def plot_positions(pair_data: Pair, directory: str | None = None,
     plt.close()
 
 
-def plot_pnl(pair_data: Pair, directory: str | None = None,
-             save: bool = True, show: bool = False, btc: bool = False) -> None:
+def plot_pnl(pair_data: Pair, btc_data: pd.DataFrame, directory: str | None = None, save: bool = True,
+             show: bool = False) -> None:
     x, y, start, end, interval = pair_data.x, pair_data.y, pair_data.start, pair_data.end, pair_data.interval
     fee_rate = pair_data.fee_rate
     df = pair_data.data
     results_dir = _resolve_results_dir(directory)
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax1.plot(df.index, df['total_return_pct'], label='Total Return [%] (Gross)', linewidth=1.6)
+    ax1.plot(df.index, df['total_return_pct'], label='Total Return [%] (Gross)', color='red', linewidth=1.6, zorder=3)
     ax1.plot(df.index, df['net_return_pct'], label=f'Total Return [%] (Net, fee: {fee_rate * 100}%)',
-             linewidth=1.6, linestyle='--')
+             linewidth=1.2, linestyle='--', color='red', zorder=3)
     ax1.set_xlabel('Date')
     ax1.set_ylabel('Total Return [%]', color='black')
     ax1.tick_params(axis='y', labelcolor='black')
     plt.grid(True, alpha=0.3)
     plt.xticks(rotation=45, ha='right')
 
-    if btc:
-        btc_data = load_data(
-            tickers=['BTCUSDT'],
-            start=start,
-            end=end,
-            interval=interval,
-        )
-        btc_data['BTC_return'] = btc_data['BTCUSDT'].pct_change()
-        btc_data.loc[btc_data.index[0], 'BTC_return'] = 0.0
-        btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
-
-        ax1.plot(btc_data.index, btc_data['BTC_cum_return'], label=f'BTCUSDT total return',
-                 linewidth=1.4, linestyle='--', color='red')
+    ax1.plot(btc_data.index, btc_data['BTC_cum_return'], label=f'BTCUSDT total return',
+             linewidth=1, linestyle='--', color='grey', zorder=1)
 
     plt.xlim(df.index.min(), df.index.max())
     ax1.legend(loc='lower right', fontsize="small")

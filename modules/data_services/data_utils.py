@@ -1,5 +1,3 @@
-import math
-from datetime import datetime, timedelta
 from functools import reduce
 import numpy as np
 import pandas as pd
@@ -27,14 +25,6 @@ def get_steps(interval: str) -> int:
     else:
         return ValueError(
             f"Wrong interval '{interval}', should be one of: '1d', '4h', '1h', '30m', '15m', '5m', '3m', '1m'.")
-
-
-def pre_training_start(start: str, interval: str, rolling_window_steps: float) -> str:
-    steps_per_day = get_steps(interval)
-    days = math.ceil(rolling_window_steps / steps_per_day)
-    date_object = datetime.strptime(start, "%Y-%m-%d")
-    new_date_object = date_object - timedelta(days=days + 1)
-    return new_date_object.strftime("%Y-%m-%d")
 
 
 def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:

@@ -7,10 +7,12 @@ import pandas as pd
 class Pair:
     x: str
     y: str
-    start: str
-    end: str
     interval: str
     data: pd.DataFrame
+    start: str
+    test_start: str = None
+    end: str = None
+
     stats: Optional[pd.DataFrame] = None
     fee_rate: float = 0
     initial_cash: float = 100000

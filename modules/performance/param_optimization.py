@@ -21,7 +21,11 @@ def bayesian_optimization(
             return -1e9
 
         full_params = {**static_params, **params}
-        score = strategy_func(**full_params, metric=metric)
+
+        try:
+            score = strategy_func(**full_params, metric=metric)
+        except ValueError:
+            return -1e9
 
         if pd.isna(score) or np.isinf(score):
             return -1e9

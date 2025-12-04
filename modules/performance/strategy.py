@@ -2,13 +2,12 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from skopt.space import Integer, Real
 
 from config import RISK_FREE_ANNUAL
 from modules.data_services.data_loaders import load_pair
 from modules.data_services.data_models import Pair
-from modules.data_services.data_utils import get_steps, pre_training_start, add_returns
-from modules.data_services.param_optimization import bayesian_optimization
+from modules.data_services.data_utils import get_steps, add_returns
+from modules.performance.param_optimization import bayesian_optimization
 from modules.performance.data_models import PositionState, StrategyParams
 
 
@@ -36,7 +35,7 @@ def get_spread(x: str, y: str, position: float) -> tuple[float, float]:  # TODO
 
 
 def generate_trade(x: str, y: str, z_score: float, beta: float, pair: Pair, position_state: PositionState,
-                   strategy_params: StrategyParams, price_x: float, price_y: float, total_fees: float, beta_hedge: bool,
+                   strategy_params: StrategyParams, price_x: float, price_y: float, total_fees: float,
                    is_spread: bool) -> tuple[float, float]:
     prev_position = position_state.prev_position
     q_x = position_state.q_x
@@ -48,11 +47,8 @@ def generate_trade(x: str, y: str, z_score: float, beta: float, pair: Pair, posi
     initial_cash = pair.initial_cash
 
     def open_position() -> tuple[float, float, float, float, float, float, float]:
-        if beta_hedge:
-            wx = 1 / (beta + 1)
-            wy = 1 - wx
-        else:
-            wx = wy = 0.5
+        wx = 1 / (beta + 1)
+        wy = 1 - wx
 
         position_cash = abs(position_state.position) * initial_cash
         x_spread, y_spread = get_spread(x, y, position_state.position) if is_spread else 1, 1
@@ -130,11 +126,7 @@ def calculate_beta_returns(x_returns: str, y_returns: str, df: pd.DataFrame) -> 
 
 
 def calculate_zscore_prices(x_price: str, y_price: str, beta: float, df: pd.DataFrame) -> float:
-    if beta:
-        spread_series = df[x_price] - (beta * df[y_price])
-    else:
-        spread_series = df[x_price] - df[y_price]
-
+    spread_series = df[x_price] - (beta * df[y_price])
     mean = spread_series.mean()
     std = spread_series.std()
     spread = spread_series.iloc[-1]
@@ -159,7 +151,17 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
     position_state = PositionState()
     strategy_params = StrategyParams
 
-    for i in range(rolling_window - 1, len(df)):
+    if pair.test_start is not None:
+        start_pos = df.index.get_loc(pd.to_datetime(pair.test_start))
+    else:
+        raise ValueError("Test start must be set to run the strategy")
+    if start_pos - rolling_window + 1 < 0:
+        raise ValueError("Rolling window cannot be bigger than pre-training period")
+    df = df.iloc[start_pos - rolling_window + 1:]
+    first_pos = rolling_window - 1
+    last_pos = df.index.get_loc(pd.to_datetime(pair.end))
+
+    for i in range(first_pos, last_pos + 1):
         if total_pnl == -initial_cash:
             # BANKRUPT
             df = df.iloc[:i].copy()
@@ -185,7 +187,7 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
                     f"{x_col}_returns", f"{y_col}_returns", df.iloc[i - rolling_window + 1:i + 1]
                 )
             else:
-                beta = None
+                beta = 1
             z_score = calculate_zscore_prices(
                 x_col, y_col, beta, df.iloc[i - rolling_window + 1:i + 1]
             )
@@ -204,7 +206,7 @@ def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None,
 
             pnl, total_fees = generate_trade(
                 x_col, y_col, z_score, beta, pair, position_state, strategy_params, price_x, price_y, total_fees,
-                beta_hedge, is_spread
+                is_spread
             )
 
             if pnl != 0:
@@ -370,13 +372,13 @@ def calculate_stats(pair: Pair) -> pd.DataFrame:
 
 def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold: float, stop_loss: float,
                      ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
-                     trading_start: str, trading_end: str, interval: str, metric: tuple, beta_hedge: bool,
-                     is_spread: bool) -> float:
+                     pre_trading_start: str, trading_start: str, trading_end: str, interval: str, metric: tuple,
+                     beta_hedge: bool, is_spread: bool) -> float:
     try:
-        pt_start = pre_training_start(start=trading_start, interval=interval, rolling_window_steps=rolling_window)
-        pair = load_pair(x=ticker_x, y=ticker_y, start=pt_start, end=trading_end, interval=interval)
+        pair = load_pair(x=ticker_x, y=ticker_y, start=pre_trading_start, end=trading_end, interval=interval)
         add_returns(pair)
 
+        pair.test_start = trading_start
         pair.fee_rate = fee_rate
         pair.initial_cash = initial_cash
 
@@ -395,25 +397,20 @@ def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold
 
     except Exception as e:
         print("Error in strategy run:", e)
-        return -1.0
+        return -1e9
 
 
 def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
-                         training_start: str, training_end: str, interval: str, is_spread: bool, static_hedge: bool,
-                         metric: tuple = ("sortino_ratio_annual", "0.05% fee")) -> tuple[dict, float]:
-    param_space = [
-        Integer(2, 700, name="rolling_window"),
-        Real(1.0, 10.0, name="entry_threshold"),
-        Real(0.0, 10.0, name="exit_threshold"),
-        Real(1.0, 3.0, name="stop_loss"),
-    ]
-
+                         pre_training_start: str, training_start: str, training_end: str, interval: str, beta_hedge: bool,
+                         is_spread: bool, param_space: list, metric: tuple = ("sortino_ratio_annual", "0.05% fee"),
+                         minimize: bool = False) -> tuple[dict, float]:
     static_params = {
         "ticker_x": ticker_x,
         "ticker_y": ticker_y,
         "fee_rate": fee_rate,
         "initial_cash": initial_cash,
         "position_size": position_size,
+        "pre_trading_start": pre_training_start,
         "trading_start": training_start,
         "trading_end": training_end,
         "interval": interval,
@@ -421,8 +418,8 @@ def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_
 
     wrapped_strategy = partial(
         strategy_wrapper,
+        beta_hedge=beta_hedge,
         is_spread=is_spread,
-        static_hedge=static_hedge,
     )
 
     best_params, best_score, results = bayesian_optimization(
@@ -430,7 +427,6 @@ def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_
         param_space=param_space,
         static_params=static_params,
         metric=metric,
-        minimize=False,
+        minimize=minimize,
     )
-
     return best_params, best_score
