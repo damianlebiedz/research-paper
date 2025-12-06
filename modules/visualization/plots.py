@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from modules.data_services.data_models import Pair
-from modules.utils.logger import get_logger
-
-logger = get_logger(__name__)
 
 
 def _resolve_results_dir(directory: str | None) -> Path:
@@ -44,7 +41,6 @@ def plot_zscore(pair_data: Pair, directory: str | None = None, save: bool = Fals
         filename = f"{x}_{y}_zscore_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
-        logger.debug(f"Saved plot: {save_path}")
     if show:
         plt.show()
     plt.close()
@@ -72,7 +68,6 @@ def plot_positions(pair_data: Pair, directory: str | None = None,
         filename = f"{x}_{y}_positions_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
-        logger.debug(f"Saved plot: {save_path}")
     if show:
         plt.show()
     plt.close()
@@ -106,7 +101,6 @@ def plot_pnl(pair_data: Pair, btc_data: pd.DataFrame, directory: str | None = No
         filename = f"{x}_{y}_return_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
-        logger.debug(f"Saved plot: {save_path}")
     if show:
         plt.show()
     plt.close()

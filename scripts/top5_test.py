@@ -56,7 +56,7 @@ if __name__ == "__main__":
     param_space = [
         Integer(2, 600, name="rolling_window"),
         Real(1.0, 5.0, name="entry_threshold"),
-        Real(0.0, 1.5, name="exit_threshold"),
+        Real(0.0, 3.0, name="exit_threshold"),
         Real(1.0, 3.0, name="stop_loss"),
     ]
     metric = ("sortino_ratio_annual", "0.05% fee")
