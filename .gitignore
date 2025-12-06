@@ -7,3 +7,5 @@ data/*
 
 results/*
 !results/.ignore
+
+.env
