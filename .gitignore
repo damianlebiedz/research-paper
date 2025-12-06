@@ -7,5 +7,3 @@ data/*
 
 results/*
 !results/.ignore
-
-colab_config.ipynb
