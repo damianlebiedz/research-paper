@@ -8,7 +8,7 @@ def bayesian_optimization(
         param_space,
         static_params: dict,
         metric: tuple,
-        n_calls: int = 100,
+        n_calls: int = 300,
         random_state: int = 42,
         minimize: bool = False,
 ):

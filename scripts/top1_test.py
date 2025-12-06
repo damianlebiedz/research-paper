@@ -3,8 +3,9 @@ from skopt.space import Integer, Real
 from modules.data_services.data_loaders import load_data, load_pair
 from modules.data_services.data_utils import add_returns
 from modules.pair_selection.statistical_tests import engle_granger_cointegration
-from modules.performance.strategy import run_strategy, calculate_stats, calc_bayesian_params
+from modules.performance.strategy import single_pair_strategy, calculate_stats, calc_bayesian_params
 from modules.visualization.plots import plot_positions, plot_zscore, plot_pnl
+
 
 if __name__ == "__main__":
     tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "TRXUSDT",
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     pair.fee_rate = fee_rate
     pair.initial_cash = initial_cash
 
-    run_strategy(pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, beta_hedge, is_spread)
+    single_pair_strategy(pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, beta_hedge, is_spread)
     pair.data.drop(columns=['total_return', 'total_fees', 'net_return'])
 
     # Calculate statistics

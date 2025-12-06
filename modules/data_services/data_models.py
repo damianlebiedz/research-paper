@@ -5,11 +5,11 @@ import pandas as pd
 
 @dataclass
 class Pair:
-    x: str
-    y: str
-    interval: str
     data: pd.DataFrame
-    start: str
+    x: str = None
+    y: str = None
+    interval: str = None
+    start: str = None
     test_start: str = None
     end: str = None
 
