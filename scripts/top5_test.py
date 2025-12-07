@@ -54,10 +54,10 @@ if __name__ == "__main__":
 
     # Perform Bayesian Optimization
     param_space = [
-        Integer(2, 600, name="rolling_window"),
-        Real(1.0, 5.0, name="entry_threshold"),
-        Real(0.0, 3.0, name="exit_threshold"),
-        Real(1.0, 3.0, name="stop_loss"),
+        Integer(10, 200, name="rolling_window"),
+        Real(1.1, 3.0, name="entry_threshold"),
+        Real(0.0, 1.0, name="exit_threshold"),
+        Real(1.1, 3.0, name="stop_loss"),
     ]
     metric = ("sortino_ratio_annual", "0.05% fee")
     minimize = False  # Maximize metric
@@ -123,8 +123,9 @@ if __name__ == "__main__":
         summary_data += p.data[cols_to_sum]
     summary = Pair(data=summary_data, start=pre_test_start, test_start=test_start, end=test_end,
                    interval=interval, fee_rate=fee_rate, initial_cash=initial_cash*5)
-    summary.data['total_return_pct'] = summary.data['total_return'] / initial_cash
-    summary.data['net_return_pct'] = summary.data['net_return'] / initial_cash
+    summary.data['total_return_pct'] = summary.data['total_return'] / (initial_cash * 5)
+    summary.data['net_return_pct'] = summary.data['net_return'] / (initial_cash * 5)
+    summary.data['position'] = summary.data['position'] / 5
     summary.stats = calculate_stats(summary)
 
     # Show statistics

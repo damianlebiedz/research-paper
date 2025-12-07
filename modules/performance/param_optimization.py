@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from skopt import gp_minimize
 
 
@@ -9,40 +8,43 @@ def bayesian_optimization(
         static_params: dict,
         metric: tuple,
         n_calls: int = 100,
+        n_initial_points: int = 10,
         random_state: int = 42,
         minimize: bool = False,
+        replicates: int = 3,
+        penalty_bad: float = -1e2,
 ):
-    def objective(**params):
-        if (
-                params["entry_threshold"] <= params["exit_threshold"]
-                or params["stop_loss"] <= params["entry_threshold"]
-                or params["rolling_window"] <= 1
-        ):
-            return -1e9
-
-        full_params = {**static_params, **params}
-
-        try:
-            score = strategy_func(**full_params, metric=metric)
-        except ValueError:
-            return -1e9
-
-        if pd.isna(score) or np.isinf(score):
-            return -1e9
-
-        return score
+    def evaluate_point(pdict):
+        scores = []
+        for r in range(replicates):
+            try:
+                val = strategy_func(**{**static_params, **pdict}, metric=metric)
+                if val is None or np.isnan(val) or np.isinf(val):
+                    scores.append(penalty_bad)
+                else:
+                    scores.append(float(val))
+            except Exception as e:
+                print(f"[eval error] {pdict} rep={r} -> {e}")
+                scores.append(penalty_bad)
+        return float(np.mean(scores))
 
     def wrapped(x):
         pdict = {dim.name: v for dim, v in zip(param_space, x)}
-        score = objective(**pdict)
+        score = evaluate_point(pdict)
+
+        if score == 0 or np.isnan(score):
+            return penalty_bad
 
         return score if minimize else -score
 
     result = gp_minimize(
         wrapped,
-        param_space,
+        dimensions=param_space,
         n_calls=n_calls,
-        random_state=random_state
+        n_initial_points=n_initial_points,
+        random_state=random_state,
+        acq_func="EI",
+        # verbose=True,
     )
 
     best_params = {dim.name: v for dim, v in zip(param_space, result.x)}
