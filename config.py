@@ -2,4 +2,5 @@
 Hyperparameters etc.
 """
 
-TICKERS = ...
+# Annualized risk-free rate
+RISK_FREE_ANNUAL = 0.01
