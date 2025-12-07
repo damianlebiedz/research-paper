@@ -3,7 +3,7 @@ from skopt.space import Integer, Real
 from modules.data_services.data_loaders import load_data, load_pair
 from modules.data_services.data_utils import add_returns
 from modules.pair_selection.statistical_tests import engle_granger_cointegration
-from modules.performance.strategy import run_strategy, calculate_stats, calc_bayesian_params
+from modules.performance.strategy import single_pair_strategy, calculate_stats, optimize_params
 from modules.visualization.plots import plot_positions, plot_zscore, plot_pnl
 
 if __name__ == "__main__":
@@ -50,17 +50,16 @@ if __name__ == "__main__":
 
     # Perform Bayesian Optimization
     param_space = [
-        Integer(2, 600, name="rolling_window"),
-        Real(1.0, 5.0, name="entry_threshold"),
-        Real(0.0, 3.0, name="exit_threshold"),
-        Real(1.0, 3.0, name="stop_loss"),
+        Integer(10, 30, name="rolling_window"),
+        Real(2.0, 3.0, name="entry_threshold"),
+        Real(0.5, 1.0, name="exit_threshold"),
+        Real(2.0, 3.0, name="stop_loss"),
     ]
     metric = ("sortino_ratio_annual", "0.05% fee")
-    minimize = False  # Maximize metric
 
-    best_params, best_score = calc_bayesian_params(ticker_x, ticker_y, fee_rate, initial_cash, position_size,
-                                                   pre_training_start, training_start, training_end, interval,
-                                                   beta_hedge, is_spread, param_space, metric, minimize)
+    best_params, best_score = optimize_params(ticker_x, ticker_y, fee_rate, initial_cash, position_size,
+                                              pre_training_start, training_start, training_end, interval,
+                                              beta_hedge, is_spread, param_space, metric)
 
     print(best_params)
     print(best_score)
@@ -84,7 +83,8 @@ if __name__ == "__main__":
     pair.fee_rate = fee_rate
     pair.initial_cash = initial_cash
 
-    run_strategy(pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, beta_hedge, is_spread)
+    single_pair_strategy(pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, beta_hedge,
+                         is_spread)
     pair.data.drop(columns=['total_return', 'total_fees', 'net_return'])
 
     # Calculate statistics

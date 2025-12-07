@@ -7,7 +7,7 @@ from config import RISK_FREE_ANNUAL
 from modules.data_services.data_loaders import load_pair
 from modules.data_services.data_models import Pair
 from modules.data_services.data_utils import get_steps, add_returns
-from modules.performance.param_optimization import bayesian_optimization
+from modules.performance.param_optimization import random_search
 from modules.performance.data_models import PositionState, StrategyParams
 
 
@@ -137,9 +137,9 @@ def calculate_zscore_prices(x_price: str, y_price: str, beta: float, df: pd.Data
     return z_score
 
 
-def run_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None, exit_threshold: float = None,
-                 stop_loss: float = None, pos_size: float = None, beta_hedge: bool = False,
-                 is_spread: bool = False) -> Pair:
+def single_pair_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None, exit_threshold: float = None,
+                         stop_loss: float = None, pos_size: float = None, beta_hedge: bool = False,
+                         is_spread: bool = False) -> Pair:
     df = pair.data.copy()
     x_col, y_col = pair.x, pair.y
     initial_cash = pair.initial_cash
@@ -370,23 +370,30 @@ def calculate_stats(pair: Pair) -> pd.DataFrame:
     return stats_df
 
 
+def run_single_pair_strategy(rolling_window: int, entry_threshold: float, exit_threshold: float, stop_loss: float,
+                             ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
+                             pre_trading_start: str, trading_start: str, trading_end: str, interval: str,
+                             beta_hedge: bool, is_spread: bool) -> Pair:
+    pair = load_pair(x=ticker_x, y=ticker_y, start=pre_trading_start, end=trading_end, interval=interval)
+    add_returns(pair)
+    pair.test_start = trading_start
+    pair.fee_rate = fee_rate
+    pair.initial_cash = initial_cash
+    single_pair_strategy(
+        pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, beta_hedge, is_spread
+    )
+    pair.stats = calculate_stats(pair)
+    return pair
+
+
 def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold: float, stop_loss: float,
                      ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
                      pre_trading_start: str, trading_start: str, trading_end: str, interval: str, metric: tuple,
                      beta_hedge: bool, is_spread: bool) -> float:
     try:
-        pair = load_pair(x=ticker_x, y=ticker_y, start=pre_trading_start, end=trading_end, interval=interval)
-        add_returns(pair)
-
-        pair.test_start = trading_start
-        pair.fee_rate = fee_rate
-        pair.initial_cash = initial_cash
-
-        run_strategy(
-            pair, rolling_window, entry_threshold, exit_threshold, stop_loss, position_size, beta_hedge, is_spread
-        )
-
-        pair.stats = calculate_stats(pair)
+        pair = run_single_pair_strategy(rolling_window, entry_threshold, exit_threshold, stop_loss, ticker_x, ticker_y,
+                                        fee_rate, initial_cash, position_size, pre_trading_start, trading_start,
+                                        trading_end, interval, beta_hedge, is_spread)
         score = pair.stats.loc[metric]
 
         if isinstance(score, pd.Series):
@@ -400,10 +407,10 @@ def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold
         return -1e9
 
 
-def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
-                         pre_training_start: str, training_start: str, training_end: str, interval: str, beta_hedge: bool,
-                         is_spread: bool, param_space: list, metric: tuple = ("sortino_ratio_annual", "0.05% fee"),
-                         minimize: bool = False) -> tuple[dict, float]:
+def optimize_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
+                    pre_training_start: str, training_start: str, training_end: str, interval: str,
+                    beta_hedge: bool, is_spread: bool, param_space: list,
+                    metric: tuple = ("sortino_ratio_annual", "0.05% fee")) -> tuple[dict, float]:
     static_params = {
         "ticker_x": ticker_x,
         "ticker_y": ticker_y,
@@ -422,11 +429,10 @@ def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_
         is_spread=is_spread,
     )
 
-    best_params, best_score, results = bayesian_optimization(
+    best_params, best_score = random_search(
         strategy_func=wrapped_strategy,
         param_space=param_space,
         static_params=static_params,
         metric=metric,
-        minimize=minimize,
     )
     return best_params, best_score

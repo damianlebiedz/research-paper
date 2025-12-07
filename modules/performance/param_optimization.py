@@ -1,51 +1,41 @@
+from skopt.space import Integer, Real
 import numpy as np
-import pandas as pd
-from skopt import gp_minimize
+from random import uniform, randint
+from joblib import Parallel, delayed
 
 
-def bayesian_optimization(
-        strategy_func,
-        param_space,
-        static_params: dict,
-        metric: tuple,
-        n_calls: int = 100,
-        random_state: int = 42,
-        minimize: bool = False,
-):
-    def objective(**params):
-        if (
-                params["entry_threshold"] <= params["exit_threshold"]
-                or params["stop_loss"] <= params["entry_threshold"]
-                or params["rolling_window"] <= 1
-        ):
-            return -1e9
+def random_search(strategy_func, param_space, static_params, metric, n_iter=500, n_jobs=-1,
+                  replicates=1, penalty_bad=-1e2):
+    def evaluate_point(pd, idx):
+        scores = []
+        for _ in range(replicates):
+            try:
+                val = strategy_func(**{**static_params, **pd}, metric=metric)
+                if val is None or np.isnan(val) or val == 0 or np.isinf(val):
+                    scores.append(penalty_bad)
+                else:
+                    scores.append(float(val))
+            except Exception as e:
+                print(e)
+                scores.append(penalty_bad)
 
-        full_params = {**static_params, **params}
+        avg_score = float(np.mean(scores))
+        print(f"Iteration {idx + 1}/{n_iter} | Score: {avg_score:.4f}")
+        return avg_score, pd
 
-        try:
-            score = strategy_func(**full_params, metric=metric)
-        except ValueError:
-            return -1e9
+    pdicts = []
+    for _ in range(n_iter):
+        pdict = {}
+        for dim in param_space:
+            if isinstance(dim, Integer):
+                pdict[dim.name] = randint(dim.low, dim.high)
+            elif isinstance(dim, Real):
+                pdict[dim.name] = uniform(dim.low, dim.high)
+        pdicts.append(pdict)
 
-        if pd.isna(score) or np.isinf(score):
-            return -1e9
-
-        return score
-
-    def wrapped(x):
-        pdict = {dim.name: v for dim, v in zip(param_space, x)}
-        score = objective(**pdict)
-
-        return score if minimize else -score
-
-    result = gp_minimize(
-        wrapped,
-        param_space,
-        n_calls=n_calls,
-        random_state=random_state
+    results = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(evaluate_point)(p, i) for i, p in enumerate(pdicts)
     )
 
-    best_params = {dim.name: v for dim, v in zip(param_space, result.x)}
-    best_score = result.fun if minimize else -result.fun
-
-    return best_params, best_score, result
+    best_score, best_params = max(results, key=lambda x: x[0])
+    return best_params, best_score

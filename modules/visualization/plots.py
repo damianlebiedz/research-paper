@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from modules.data_services.data_models import Pair
-from modules.utils.logger import get_logger
-
-logger = get_logger(__name__)
 
 
 def _resolve_results_dir(directory: str | None) -> Path:
@@ -17,8 +14,7 @@ def _resolve_results_dir(directory: str | None) -> Path:
     return base
 
 
-def plot_zscore(pair_data: Pair, directory: str | None = None,
-                thresholds: bool = False, save: bool = False, show: bool = True) -> None:
+def plot_zscore(pair_data: Pair, directory: str | None = None, save: bool = False, show: bool = True) -> None:
     x, y = pair_data.x, pair_data.y
     start, end = pair_data.start, pair_data.end
     interval = pair_data.interval
@@ -27,14 +23,6 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
 
     plt.figure(figsize=(12, 6))
     sns.lineplot(x=df.index, y=df["z_score"], color="grey")
-
-    if "z_score_virtual" in df.columns and not df["z_score_virtual"].isna().all():
-        plt.plot(
-            df.index,
-            df["z_score_virtual"].astype(float),
-            color="blue",
-            label="z_score_virtual"
-        )
 
     plt.plot(df.index, df["entry_thr"].astype(float), color="red", label="entry_thr")
     plt.plot(df.index, -df["entry_thr"].astype(float), color="red")
@@ -47,15 +35,12 @@ def plot_zscore(pair_data: Pair, directory: str | None = None,
     plt.grid(True, alpha=0.3)
     plt.xticks(rotation=45, ha='right')
     plt.xlim(df.index.min(), df.index.max())
-    plt.legend()
+    plt.legend(loc="lower right", fontsize="small")
 
-    if thresholds:
-        plt.legend(loc="lower right", fontsize="small")
     if save:
         filename = f"{x}_{y}_zscore_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
-        logger.debug(f"Saved plot: {save_path}")
     if show:
         plt.show()
     plt.close()
@@ -83,7 +68,6 @@ def plot_positions(pair_data: Pair, directory: str | None = None,
         filename = f"{x}_{y}_positions_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
-        logger.debug(f"Saved plot: {save_path}")
     if show:
         plt.show()
     plt.close()
@@ -117,7 +101,6 @@ def plot_pnl(pair_data: Pair, btc_data: pd.DataFrame, directory: str | None = No
         filename = f"{x}_{y}_return_{start}_{end}_{interval}.png".replace(":", "-")
         save_path = results_dir / filename
         plt.savefig(save_path, dpi=150)
-        logger.debug(f"Saved plot: {save_path}")
     if show:
         plt.show()
     plt.close()
