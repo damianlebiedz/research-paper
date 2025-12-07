@@ -7,7 +7,7 @@ from config import RISK_FREE_ANNUAL
 from modules.data_services.data_loaders import load_pair
 from modules.data_services.data_models import Pair
 from modules.data_services.data_utils import get_steps, add_returns
-from modules.performance.param_optimization import bayesian_optimization
+from modules.performance.param_optimization import random_search
 from modules.performance.data_models import PositionState, StrategyParams
 
 
@@ -407,11 +407,10 @@ def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold
         return -1e9
 
 
-def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
-                         pre_training_start: str, training_start: str, training_end: str, interval: str,
-                         beta_hedge: bool,
-                         is_spread: bool, param_space: list, metric: tuple = ("sortino_ratio_annual", "0.05% fee"),
-                         minimize: bool = False) -> tuple[dict, float]:
+def optimize_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
+                    pre_training_start: str, training_start: str, training_end: str, interval: str,
+                    beta_hedge: bool, is_spread: bool, param_space: list,
+                    metric: tuple = ("sortino_ratio_annual", "0.05% fee")) -> tuple[dict, float]:
     static_params = {
         "ticker_x": ticker_x,
         "ticker_y": ticker_y,
@@ -430,11 +429,10 @@ def calc_bayesian_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_
         is_spread=is_spread,
     )
 
-    best_params, best_score, results = bayesian_optimization(
+    best_params, best_score = random_search(
         strategy_func=wrapped_strategy,
         param_space=param_space,
         static_params=static_params,
         metric=metric,
-        minimize=minimize,
     )
     return best_params, best_score

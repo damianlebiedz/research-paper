@@ -4,9 +4,8 @@ from modules.data_services.data_loaders import load_data, load_pair
 from modules.data_services.data_models import Pair
 from modules.data_services.data_utils import add_returns
 from modules.pair_selection.statistical_tests import engle_granger_cointegration
-from modules.performance.strategy import calc_bayesian_params, calculate_stats, single_pair_strategy
+from modules.performance.strategy import optimize_params, calculate_stats, single_pair_strategy
 from modules.visualization.plots import plot_positions, plot_pnl, plot_zscore
-
 
 if __name__ == "__main__":
     tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "TRXUSDT",
@@ -52,15 +51,14 @@ if __name__ == "__main__":
     test_start = "2024-03-01"
     test_end = "2024-04-01"
 
-    # Perform Bayesian Optimization
+    # Perform Parameter Optimization
     param_space = [
-        Integer(10, 200, name="rolling_window"),
-        Real(1.1, 3.0, name="entry_threshold"),
-        Real(0.0, 1.0, name="exit_threshold"),
-        Real(1.1, 3.0, name="stop_loss"),
+        Integer(10, 30, name="rolling_window"),
+        Real(2.0, 3.0, name="entry_threshold"),
+        Real(0.5, 1.0, name="exit_threshold"),
+        Real(2.0, 3.0, name="stop_loss"),
     ]
     metric = ("sortino_ratio_annual", "0.05% fee")
-    minimize = False  # Maximize metric
 
     pairs = []
     for ticker in tickers:
@@ -68,10 +66,9 @@ if __name__ == "__main__":
         ticker_y = ticker.split('-')[1]
         print(f"Pair: {ticker_x}/{ticker_y}")
 
-        best_params, best_score = calc_bayesian_params(ticker_x, ticker_y, fee_rate, initial_cash, position_size,
-                                                       pre_training_start, training_start, training_end,
-                                                       interval, beta_hedge, is_spread, param_space, metric,
-                                                       minimize)
+        best_params, best_score = optimize_params(ticker_x, ticker_y, fee_rate, initial_cash, position_size,
+                                                  pre_training_start, training_start, training_end,
+                                                  interval, beta_hedge, is_spread, param_space, metric)
         print(best_params)
         print(best_score)
 
@@ -122,7 +119,7 @@ if __name__ == "__main__":
     for p in pairs[1:]:
         summary_data += p.data[cols_to_sum]
     summary = Pair(data=summary_data, start=pre_test_start, test_start=test_start, end=test_end,
-                   interval=interval, fee_rate=fee_rate, initial_cash=initial_cash*5)
+                   interval=interval, fee_rate=fee_rate, initial_cash=initial_cash * 5)
     summary.data['total_return_pct'] = summary.data['total_return'] / (initial_cash * 5)
     summary.data['net_return_pct'] = summary.data['net_return'] / (initial_cash * 5)
     summary.data['position'] = summary.data['position'] / 5
