@@ -54,7 +54,7 @@ if __name__ == "__main__":
     # Perform Parameter Optimization
     param_space = [
         Integer(10, 30, name="rolling_window"),
-        Real(2.0, 3.0, name="entry_threshold"),
+        Real(2.0, 2.5, name="entry_threshold"),
         Real(0.5, 1.0, name="exit_threshold"),
         Real(2.0, 3.0, name="stop_loss"),
     ]
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         pairs.append(pair)
 
         # Visualization
-        plot_positions(pair, 'multi_pair_strategy', True, True)
+        plot_positions(pair, directory='multi_pair_strategy', show=True, save=True)
 
         btc_data = load_data(
             tickers=['BTCUSDT'],
@@ -111,8 +111,8 @@ if __name__ == "__main__":
         btc_data.loc[btc_data.index[0], 'BTC_return'] = 0.0
         btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
 
-        plot_pnl(pair, btc_data, 'multi_pair_strategy', True, True)
-        plot_zscore(pair)
+        plot_pnl(pair, btc_data, directory='multi_pair_strategy', show=True, save=True)
+        plot_zscore(pair, directory='multi_pair_strategy', show=True, save=True)
 
     cols_to_sum = ['position', 'total_return', 'total_fees', 'net_return']
     summary_data = pairs[0].data[cols_to_sum].copy()
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     print(summary.stats)
 
     # Visualization
-    plot_positions(summary, 'multi_pair_strategy', True, True)
+    plot_positions(summary, directory='multi_pair_strategy', show=True, save=True)
 
     btc_data = load_data(
         tickers=['BTCUSDT'],
@@ -141,4 +141,4 @@ if __name__ == "__main__":
     btc_data.loc[btc_data.index[0], 'BTC_return'] = 0.0
     btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
 
-    plot_pnl(summary, btc_data, 'multi_pair_strategy', True, True)
+    plot_pnl(summary, btc_data, directory='multi_pair_strategy', show=True, save=True)

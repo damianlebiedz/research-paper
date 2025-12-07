@@ -92,7 +92,7 @@ if __name__ == "__main__":
     print(pair.stats)
 
     # Visualization
-    plot_positions(pair, 'strategy', True, True)
+    plot_positions(pair, directory="strategy", show=True, save=True)
 
     btc_data = load_data(
         tickers=['BTCUSDT'],
@@ -104,5 +104,5 @@ if __name__ == "__main__":
     btc_data.loc[btc_data.index[0], 'BTC_return'] = 0.0
     btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
 
-    plot_pnl(pair, btc_data, 'strategy', True, True)
-    plot_zscore(pair)
+    plot_pnl(pair, btc_data, directory="strategy", show=True, save=True)
+    plot_zscore(pair, directory="strategy", show=True, save=True)

@@ -46,8 +46,7 @@ def plot_zscore(pair_data: Pair, directory: str | None = None, save: bool = Fals
     plt.close()
 
 
-def plot_positions(pair_data: Pair, directory: str | None = None,
-                   save: bool = True, show: bool = False) -> None:
+def plot_positions(pair_data: Pair, directory: str | None = None, save: bool = True, show: bool = False) -> None:
     x, y, start, end, interval = pair_data.x, pair_data.y, pair_data.start, pair_data.end, pair_data.interval
     df = pair_data.data
     results_dir = _resolve_results_dir(directory)
