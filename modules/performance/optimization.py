@@ -1,3 +1,5 @@
+from typing import Any
+
 from skopt.space import Integer, Real
 import numpy as np
 from random import uniform, randint
@@ -5,8 +7,11 @@ from joblib import Parallel, delayed
 
 
 def random_search(strategy_func, param_space, static_params, metric, n_iter=500, n_jobs=-1,
-                  replicates=1, penalty_bad=-1e2):
-    def evaluate_point(pd, idx):
+                  replicates=1, penalty_bad=-1e2) -> tuple[Any, float]:
+    """Perform a random search over the parameter space."""
+
+    def evaluate_point(pd, idx) -> float:
+        """Evaluate a point in the parameter space."""
         scores = []
         for _ in range(replicates):
             try:
@@ -21,7 +26,8 @@ def random_search(strategy_func, param_space, static_params, metric, n_iter=500,
 
         avg_score = float(np.mean(scores))
         print(f"Iteration {idx + 1}/{n_iter} | Score: {avg_score:.4f}")
-        return avg_score, pd
+
+        return avg_score
 
     pdicts = []
     for _ in range(n_iter):
@@ -36,6 +42,6 @@ def random_search(strategy_func, param_space, static_params, metric, n_iter=500,
     results = Parallel(n_jobs=n_jobs, backend="loky")(
         delayed(evaluate_point)(p, i) for i, p in enumerate(pdicts)
     )
-
     best_score, best_params = max(results, key=lambda x: x[0])
+
     return best_params, best_score

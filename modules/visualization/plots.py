@@ -1,9 +1,10 @@
+"""Generate plots for the Pair."""
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from modules.data_services.data_models import Pair
+from modules.core.models import Pair
 
 
 def _resolve_results_dir(directory: str | None) -> Path:

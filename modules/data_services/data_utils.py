@@ -2,10 +2,11 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 
-from modules.data_services.data_models import Pair
+from modules.core.models import Pair
 
 
 def get_steps(interval: str) -> int:
+    """Get steps of the interval."""
     if interval == '1d':
         return 1
     elif interval == '4h':
@@ -28,6 +29,7 @@ def get_steps(interval: str) -> int:
 
 
 def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.DataFrame:
+    """Merge dataframes from statistical tests into one dataframe."""
     trimmed = []
     for df, cols in zip(dfs, keep_cols):
         trimmed.append(df[['pair'] + cols])
@@ -37,6 +39,7 @@ def merge_by_pair(dfs: list[pd.DataFrame], keep_cols: list[list[str]]) -> pd.Dat
 
 
 def add_returns(pair: Pair) -> None:
+    """Add return and log return columns into Pair data."""
     data = pair.data.copy()
     col_x = pair.x
     col_y = pair.y

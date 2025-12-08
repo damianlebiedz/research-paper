@@ -1,13 +1,17 @@
+import hydra
+from omegaconf import DictConfig
 from skopt.space import Integer, Real
 
 from modules.data_services.data_loaders import load_data, load_pair
-from modules.data_services.data_models import Pair
+from modules.core.models import Pair
 from modules.data_services.data_utils import add_returns
-from modules.pair_selection.statistical_tests import engle_granger_cointegration
+from modules.data_services.statistical_tests import engle_granger_cointegration
 from modules.performance.strategy import optimize_params, calculate_stats, single_pair_strategy
 from modules.visualization.plots import plot_positions, plot_pnl, plot_zscore
 
-if __name__ == "__main__":
+
+@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+def main(cfg: DictConfig):
     tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "TRXUSDT",
                "DOTUSDT", "LINKUSDT", "SHIBUSDT", "LTCUSDT", "BCHUSDT", "UNIUSDT"]
     interval = "1h"
@@ -93,7 +97,7 @@ if __name__ == "__main__":
         print(pair.data.drop(columns=['total_return', 'total_fees', 'net_return']))
 
         # Calculate statistics
-        pair.stats = calculate_stats(pair)
+        pair.stats = calculate_stats(pair=pair, risk_free_rate_annual=cfg.risk_free_rate_annual)
         print(pair.stats)
 
         pairs.append(pair)
@@ -123,7 +127,7 @@ if __name__ == "__main__":
     summary.data['total_return_pct'] = summary.data['total_return'] / (initial_cash * 5)
     summary.data['net_return_pct'] = summary.data['net_return'] / (initial_cash * 5)
     summary.data['position'] = summary.data['position'] / 5
-    summary.stats = calculate_stats(summary)
+    summary.stats = calculate_stats(pair=summary, risk_free_rate_annual=cfg.risk_free_rate_annual)
 
     # Show statistics
     print(summary.stats)
@@ -142,3 +146,7 @@ if __name__ == "__main__":
     btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
 
     plot_pnl(summary, btc_data, directory='multi_pair_strategy', show=True, save=True)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,4 @@
+"""Perform statistical tests for the pair selection."""
 from itertools import combinations
 import numpy as np
 import pandas as pd
@@ -57,8 +58,7 @@ def engle_granger_cointegration(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(results).sort_values(by='eg_p_value', ascending=True).reset_index(drop=True)
 
 
-def johansen_cointegration(df: pd.DataFrame, det_order: int = 0,
-                           k_ar_diff: int = 1) -> pd.DataFrame:
+def johansen_cointegration(df: pd.DataFrame, det_order: int = 0, k_ar_diff: int = 1) -> pd.DataFrame:
     df_clean = df[df.columns].dropna()
     results = []
 

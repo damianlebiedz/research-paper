@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 
-from modules.data_services.data_models import Pair
+from modules.core.models import Pair
 
 
 def load_single_ticker(ticker: str, start: str, end: str, interval: str, base_dir: Path) -> pd.DataFrame:
