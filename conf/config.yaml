@@ -2,13 +2,9 @@ defaults:
   - _self_
   - agent: a2c_baseline
 
-hydra:
-  run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
-
 market:
   initial_cash: 100000
-  fee_rate: 0.001
+  fee_rate: 0.0005
   risk_free_rate_annual: 0.01
   interval: "1h"
   tickers:
@@ -33,36 +29,11 @@ pair_selection:
   start: "2024-01-01"
   end: "2024-03-01"
 
-  method: "engle_granger"           # engle_granger, johansen, pearson_ret, pearson_log_ret, or ssd_c_ret
-  top_n: 1                          # number of top n pairs taken into simulation
-
 training:
   # pre_start < start < end
   pre_start: "2024-01-01"
   start: "2024-02-01"
   end: "2024-03-01"
-
-  # random-search configuration
-  optimization:
-    n_iter: 500                     # number of interation in random-search
-    metric: "sortino_ratio_annual"  # objective function
-
-    # random-search parameter space
-    space:
-      rolling_window:
-        min: 10
-        max: 30
-        type: "int"
-
-      entry_threshold:
-        min: 2.0
-        max: 3.0
-        type: "float"
-
-      stop_loss:
-        min: 0.5
-        max: 1.0
-        type: "float"
 
 strategy:
   # pre_start < start < end
@@ -76,6 +47,6 @@ strategy:
   # static parameters (if run without optimization/RL)
   rolling_window: 20
   entry_threshold: 2.0
-  stop_loss: 4.0
-  pos_size: 1.0
-  exit_threshold: 0.0
+  stop_loss: 2.0
+  pos_size: 1.0 # 1.0 -> always 100% of portfolio in position
+  exit_threshold: 0.5

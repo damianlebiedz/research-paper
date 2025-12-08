@@ -1,10 +1,8 @@
 import pandas as pd
 import statsmodels.api as sm
 
-from modules.core.models import Pair
 
-
-def generate_signal(entry_threshold: float, z_score: float) -> Pair:
+def generate_signal(entry_threshold: float, z_score: float) -> int:
     """
     Generate signals for trades depends on current Z-Score.
 
@@ -19,20 +17,6 @@ def generate_signal(entry_threshold: float, z_score: float) -> Pair:
         elif z_score >= entry_threshold:
             signal = -1
     return signal
-
-
-def get_spread(x: str, y: str, position: float) -> tuple[float, float]:  # TODO
-    """Get spread for two assets depending on position."""
-    if position == 0:
-        # SPREAD FOR POSITION CLOSING
-        ...
-    elif position > 0:
-        # SPREAD FOR POSITIVE POSITION OPENING
-        ...
-    else:
-        # SPREAD FOR NEGATIVE POSITION OPENING
-        ...
-    return 1, 1
 
 
 def calculate_beta_returns(x_returns: str, y_returns: str, df: pd.DataFrame) -> float:

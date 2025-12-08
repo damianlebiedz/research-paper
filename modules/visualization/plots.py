@@ -7,8 +7,13 @@ from pathlib import Path
 from modules.core.models import Pair
 
 
+def get_project_root() -> Path:
+    """Returns the absolute path to the project root directory."""
+    return Path(__file__).resolve().parents[2]
+
+
 def _resolve_results_dir(directory: str | None) -> Path:
-    base = Path().resolve().parent / "results"
+    base = get_project_root() / "results"
     if directory:
         base = base / directory
     base.mkdir(parents=True, exist_ok=True)

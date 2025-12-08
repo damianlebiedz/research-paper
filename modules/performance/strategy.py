@@ -1,95 +1,14 @@
 from functools import partial
 import pandas as pd
 
-from modules.core.indicators import get_spread, calculate_beta_returns, calculate_zscore_prices, generate_signal
+from modules.core.execution import TradeExecutor
+from modules.core.indicators import calculate_beta_returns, calculate_zscore_prices, generate_signal
 from modules.data_services.data_loaders import load_pair
 from modules.core.models import Pair
 from modules.data_services.data_utils import add_returns
 from modules.performance.optimization import random_search
 from modules.core.models import PositionState, StrategyParams
 from modules.performance.stats import calculate_stats
-
-
-def generate_trade(x: str, y: str, z_score: float, beta: float, pair: Pair, position_state: PositionState,
-                   strategy_params: StrategyParams, price_x: float, price_y: float, total_fees: float,
-                   is_spread: bool) -> tuple[float, float]:
-    prev_position = position_state.prev_position
-    q_x = position_state.q_x
-    q_y = position_state.q_y
-
-    exit_threshold = strategy_params.exit_threshold
-    stop_loss = strategy_params.stop_loss
-    fee_rate = pair.fee_rate
-    initial_cash = pair.initial_cash
-
-    def open_position() -> tuple[float, float, float, float, float, float, float]:
-        wx = 1 / (beta + 1)
-        wy = 1 - wx
-
-        position_cash = abs(position_state.position) * initial_cash
-        x_spread, y_spread = get_spread(x, y, position_state.position) if is_spread else 1, 1
-
-        if position_state.position > 0:
-            qx = position_cash * wx / (price_x * x_spread)
-            qy = -(position_cash * wy) / (price_y * y_spread)
-        elif position_state.position < 0:
-            qx = -(position_cash * wx) / (price_x * x_spread)
-            qy = position_cash * wy / (price_y * y_spread)
-        else:
-            raise ValueError("Position cannot be 0 while opening")
-
-        entry_value = abs(qx) * price_x + abs(qy) * price_y
-        pos_fees = entry_value * fee_rate
-        t_fees = total_fees + pos_fees
-        stop_loss_thr = abs(z_score * stop_loss)
-        return qx, qy, wx, wy, entry_value, stop_loss_thr, t_fees
-
-    def close_position() -> tuple[float, float]:
-        x_spread, y_spread = get_spread(x, y, 0) if is_spread else 1, 1
-        exit_value = abs(q_x) * (price_x * x_spread) + abs(q_y) * (price_y * y_spread)
-        pos_fees = exit_value * fee_rate
-        if position_state.prev_position > 0:
-            pos_pnl = exit_value - position_state.entry_val
-        elif position_state.prev_position < 0:
-            pos_pnl = position_state.entry_val - exit_value
-        else:
-            raise ValueError("Position cannot be 0 while closing")
-        t_fees = total_fees + pos_fees
-        return pos_pnl, t_fees
-
-    # IN POSITION
-    if prev_position != 0:
-        # CLOSE POSITION (STOP LOSS OR TAKE PROFIT)
-        if (
-                prev_position < 0 and (
-                z_score <= exit_threshold or (
-                position_state.stop_loss_threshold is not None and z_score >= position_state.stop_loss_threshold))) or (
-                prev_position > 0 and (
-                z_score >= -exit_threshold or (
-                position_state.stop_loss_threshold is not None and z_score <= -position_state.stop_loss_threshold))
-        ):
-            pnl, total_fees = close_position()
-            position_state.clear_position()
-        # STAY IN POSITION
-        else:
-            exit_val = abs(q_x) * price_x + abs(q_y) * price_y
-            if prev_position > 0:
-                pnl = exit_val - position_state.entry_val
-            else:
-                pnl = position_state.entry_val - exit_val
-            position_state.position = prev_position
-    # OUT OF POSITION
-    else:
-        # OPEN POSITION
-        if position_state.position != 0:
-            q_x, q_y, w_x, w_y, entry_val, stop_loss_threshold, total_fees = open_position()
-            position_state.update_position(position_state.position, prev_position, q_x, q_y, w_x, w_y, entry_val,
-                                           stop_loss_threshold)
-            pnl = 0
-        # STAY OUT OF POSITION
-        else:
-            pnl = 0
-    return pnl, total_fees
 
 
 def single_pair_strategy(pair: Pair, rolling_window: int, entry_threshold: float = None, exit_threshold: float = None,
@@ -154,14 +73,13 @@ def single_pair_strategy(pair: Pair, rolling_window: int, entry_threshold: float
                     # TODO: Agent
                     pos_size = ...  # [-1,1]
 
-            if beta is not None and beta >= 0:
+            if beta is not None and beta >= 0: # Execute trade only if beta exists and is >= 0
                 position_state.position = signal * pos_size
 
             strategy_params.pos_size = pos_size
 
-            pnl, total_fees = generate_trade(
-                x_col, y_col, z_score, beta, pair, position_state, strategy_params, price_x, price_y, total_fees,
-                is_spread
+            pnl, total_fees = TradeExecutor.execute(
+                pair, position_state, strategy_params, price_x, price_y, z_score, beta, total_fees, is_spread
             )
 
             if pnl != 0:
@@ -239,7 +157,7 @@ def strategy_wrapper(rolling_window: int, entry_threshold: float, exit_threshold
 
 def optimize_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash: float, position_size: float,
                     pre_training_start: str, training_start: str, training_end: str, interval: str,
-                    beta_hedge: bool, is_spread: bool, param_space: list,
+                    beta_hedge: bool, is_spread: bool, risk_free_rate_annual: float, param_space: list,
                     metric: tuple = ("sortino_ratio_annual", "0.05% fee")) -> tuple[dict, float]:
     static_params = {
         "ticker_x": ticker_x,
@@ -257,6 +175,7 @@ def optimize_params(ticker_x: str, ticker_y: str, fee_rate: float, initial_cash:
         strategy_wrapper,
         beta_hedge=beta_hedge,
         is_spread=is_spread,
+        risk_free_rate_annual=risk_free_rate_annual,
     )
 
     best_params, best_score = random_search(

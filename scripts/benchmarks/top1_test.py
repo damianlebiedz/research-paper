@@ -1,3 +1,4 @@
+import logging
 import hydra
 from omegaconf import DictConfig
 from skopt.space import Integer, Real
@@ -8,24 +9,27 @@ from modules.data_services.statistical_tests import engle_granger_cointegration
 from modules.performance.strategy import single_pair_strategy, calculate_stats, optimize_params
 from modules.visualization.plots import plot_positions, plot_zscore, plot_pnl
 
+logger = logging.getLogger(__name__)
+
 
 @hydra.main(version_base=None, config_path="../../conf", config_name="config")
 def main(cfg: DictConfig):
-    tickers = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "TRXUSDT",
-               "DOTUSDT", "LINKUSDT", "SHIBUSDT", "LTCUSDT", "BCHUSDT", "UNIUSDT"]
-    interval = "1h"
+    # Load configuration
+    tickers = cfg.market.tickers
+    interval = cfg.market.interval
 
-    fee_rate = 0.0005  # 0.05%
-    initial_cash = 100000
-    position_size = 1  # always 100% of portfolio
+    fee_rate = cfg.market.fee_rate
+    initial_cash = cfg.market.initial_cash
+    risk_free_rate = cfg.market.risk_free_rate_annual
 
-    beta_hedge = True
-    is_spread = False
+    position_size = cfg.strategy.pos_size
+    beta_hedge = cfg.strategy.beta_hedge
+    is_spread = cfg.strategy.is_spread
 
     ### === 1. Training ===
 
-    pair_selection_start = "2024-01-01"
-    pair_selection_end = "2024-03-01"
+    pair_selection_start = cfg.pair_selection.start
+    pair_selection_end = cfg.pair_selection.end
 
     ### === 1.1 Pair Selection ===
 
@@ -39,7 +43,7 @@ def main(cfg: DictConfig):
 
     # Pair Selection
     eg_df = engle_granger_cointegration(df)
-    print(eg_df.head(5))
+    logger.info(eg_df.head(5))
 
     # Select a TOP1 pair
     tickers = eg_df.iloc[0:1, 0].tolist()
@@ -48,9 +52,9 @@ def main(cfg: DictConfig):
 
     # === 1.2 Parameter optimization ===
 
-    pre_training_start = "2024-01-01"
-    training_start = "2024-02-01"
-    training_end = "2024-03-01"
+    pre_training_start = cfg.training.pre_start
+    training_start = cfg.training.start
+    training_end = cfg.training.end
 
     param_space = [
         Integer(10, 30, name="rolling_window"),
@@ -58,19 +62,19 @@ def main(cfg: DictConfig):
         Real(0.5, 1.0, name="exit_threshold"),
         Real(2.0, 3.0, name="stop_loss"),
     ]
-    metric = ("sortino_ratio_annual", "0.05% fee")
+    metric = ("sortino_ratio_annual", "0.05% fee") # Objective function
 
     best_params, best_score = optimize_params(ticker_x, ticker_y, fee_rate, initial_cash, position_size,
-                                              pre_training_start, training_start, training_end, interval,
-                                              beta_hedge, is_spread, param_space, metric)
+                                              pre_training_start, training_start, training_end, interval, beta_hedge,
+                                              is_spread, risk_free_rate, param_space, metric)
 
-    print(best_params)
-    print(best_score)
+    logger.info(best_params)
+    logger.info(best_score)
 
     # === 2. Test ===
-    pre_test_start = "2024-02-01"
-    test_start = "2024-03-01"
-    test_end = "2024-04-01"
+    pre_test_start = cfg.strategy.pre_start
+    test_start = cfg.strategy.start
+    test_end = cfg.strategy.end
 
     # Load pair and calculate returns
     pair = load_pair(x=ticker_x, y=ticker_y, start=pre_test_start, end=test_end, interval=interval)
@@ -91,8 +95,8 @@ def main(cfg: DictConfig):
     pair.data.drop(columns=['total_return', 'total_fees', 'net_return'])
 
     # Calculate statistics
-    pair.stats = calculate_stats(pair=pair, risk_free_rate_annual=cfg.risk_free_rate_annual)
-    print(pair.stats)
+    pair.stats = calculate_stats(pair=pair, risk_free_rate_annual=risk_free_rate)
+    logger.info(pair.stats)
 
     # Visualization
     plot_positions(pair, directory="strategy", show=True, save=True)
