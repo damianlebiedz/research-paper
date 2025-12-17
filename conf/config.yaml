@@ -1,0 +1,39 @@
+defaults:
+  - _self_
+  - agent: a2c_baseline
+
+market:
+  initial_cash: 100000
+  fee_rate: 0.0005
+  risk_free_rate_annual: 0.01
+  interval: "1h"
+  tickers:
+    - "BTCUSDT"
+    - "ETHUSDT"
+    - "BNBUSDT"
+    - "SOLUSDT"
+    - "XRPUSDT"
+    - "ADAUSDT"
+    - "AVAXUSDT"
+    - "DOGEUSDT"
+    - "TRXUSDT"
+    - "DOTUSDT"
+    - "LINKUSDT"
+    - "SHIBUSDT"
+    - "LTCUSDT"
+    - "BCHUSDT"
+    - "UNIUSDT"
+
+pair_selection:
+  start: "2024-01-01"
+  end: "2024-03-01"
+
+training:
+  pre_start: "2024-01-01"
+  start: "2024-02-01"
+  end: "2024-03-01"
+
+strategy:
+  pre_start: "2024-01-01"
+  start: "2024-03-01"
+  end: "2024-04-01"

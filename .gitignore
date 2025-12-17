@@ -1,5 +1,7 @@
 .idea
 __pycache__
+.hydra/
+*.log
 
 data/*
 !data/.ignore
