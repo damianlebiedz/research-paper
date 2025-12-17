@@ -1,8 +1,11 @@
 from functools import reduce
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 from modules.core.models import Pair
+from modules.data_services.data_loaders import load_data
 
 
 def get_steps(interval: str) -> int:
@@ -73,3 +76,27 @@ def minmax_scale(pair_data: Pair) -> Pair:
     df[f"{pair_data.y}_scaled"] = minmax_scale_series(df[pair_data.y])
     pair_data.data = df
     return pair_data
+
+
+def load_btc_benchmark(test_start: str, test_end: str, interval: str) -> pd.DataFrame:
+    btc_data = load_data(
+        tickers=['BTCUSDT'],
+        start=test_start,
+        end=test_end,
+        interval=interval,
+    )
+    btc_data['BTC_return'] = btc_data['BTCUSDT'].pct_change()
+    btc_data.loc[btc_data.index[0], 'BTC_return'] = 0.0
+    btc_data['BTC_cum_return'] = (1 + btc_data['BTC_return']).cumprod() - 1
+    return btc_data
+
+
+def save_to_parquet(df: pd.DataFrame, file_name: str) -> None:
+    PARQUET_DIR = Path.cwd() / "parquets"
+    PARQUET_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(PARQUET_DIR / f"{file_name}.parquet")
+
+
+def load_parquet(file_name: str) -> pd.DataFrame:
+    PARQUET_DIR = Path.cwd() / "parquets"
+    return pd.read_parquet(PARQUET_DIR / f"{file_name}.parquet")

@@ -19,13 +19,13 @@ def generate_signal(entry_threshold: float, z_score: float) -> int:
     return signal
 
 
-def calculate_beta_returns(x_returns: str, y_returns: str, df: pd.DataFrame) -> float:
+def calculate_beta(x_col: str, y_col: str, df: pd.DataFrame) -> float:
     """Calculate beta from OLS with returns for a pair."""
-    X = sm.add_constant(df[y_returns])
-    y = df[x_returns]
+    X = sm.add_constant(df[y_col])
+    y = df[x_col]
     model = sm.OLS(y, X, missing="drop").fit()
 
-    beta = model.params[y_returns]
+    beta = model.params[y_col]
     return beta
 
 

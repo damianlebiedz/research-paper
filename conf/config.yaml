@@ -25,28 +25,15 @@ market:
     - "UNIUSDT"
 
 pair_selection:
-  # start < end
   start: "2024-01-01"
   end: "2024-03-01"
 
 training:
-  # pre_start < start < end
   pre_start: "2024-01-01"
   start: "2024-02-01"
   end: "2024-03-01"
 
 strategy:
-  # pre_start < start < end
-  pre_start: "2024-02-01"
+  pre_start: "2024-01-01"
   start: "2024-03-01"
   end: "2024-04-01"
-
-  beta_hedge: True
-  is_spread: False
-
-  # static parameters (if run without optimization/RL)
-  rolling_window: 20
-  entry_threshold: 2.0
-  stop_loss: 2.0
-  pos_size: 1.0 # 1.0 -> always 100% of portfolio in position
-  exit_threshold: 0.5
