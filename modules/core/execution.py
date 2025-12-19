@@ -1,4 +1,4 @@
-from modules.core.models import Pair, PositionState, StrategyParams
+from modules.core.models import ExecutionContext, PositionState
 
 
 class TradeExecutor:
@@ -16,8 +16,18 @@ class TradeExecutor:
             return 1.0, 1.0
 
     @classmethod
-    def execute(cls, pair: Pair, position_state: PositionState, strategy_params: StrategyParams, price_x: float,
-                price_y: float, z_score: float, beta: float, total_fees: float) -> tuple[float, float]:
+    def execute(
+            cls,
+            ctx: ExecutionContext,
+            position_state: PositionState,
+            price_x: float,
+            price_y: float,
+            z_score: float,
+            beta: float,
+            total_fees: float,
+            exit_threshold: float,
+            stop_loss: float,
+    ) -> tuple[float, float]:
         """
         Main execution method.
         Returns: (pnl_from_this_step, updated_total_fees)
@@ -28,14 +38,27 @@ class TradeExecutor:
         if position_state.prev_position != 0:
             # CLOSE POSITION (STOP LOSS OR TAKE PROFIT)
             if (
-                    position_state.prev_position < 0 and (
-                    z_score <= strategy_params.exit_threshold or (
-                    position_state.stop_loss_threshold is not None and z_score >= position_state.stop_loss_threshold))) or (
-                    position_state.prev_position > 0 and (
-                    z_score >= -strategy_params.exit_threshold or (
-                    position_state.stop_loss_threshold is not None and z_score <= -position_state.stop_loss_threshold))
+                    position_state.prev_position < 0
+                    and (
+                            z_score <= exit_threshold
+                            or (
+                                    position_state.stop_loss_threshold is not None
+                                    and z_score >= position_state.stop_loss_threshold
+                            )
+                    )
+            ) or (
+                    position_state.prev_position > 0
+                    and (
+                            z_score >= -exit_threshold
+                            or (
+                                    position_state.stop_loss_threshold is not None
+                                    and z_score <= -position_state.stop_loss_threshold
+                            )
+                    )
             ):
-                return cls._close_position(pair, position_state, price_x, price_y, total_fees)
+                return cls._close_position(
+                    ctx, position_state, price_x, price_y, total_fees
+                )
 
             # HOLD POSITION
             else:
@@ -46,70 +69,100 @@ class TradeExecutor:
             # OPEN POSITION
             if position_state.position != 0:
                 return cls._open_position(
-                    beta, z_score, pair, position_state, strategy_params, price_x, price_y, total_fees
+                    ctx,
+                    beta,
+                    z_score,
+                    position_state,
+                    price_x,
+                    price_y,
+                    total_fees,
+                    stop_loss,
                 )
             # STAY OUT OF POSITION
             else:
                 return 0, total_fees
 
     @classmethod
-    def _open_position(cls, beta, z_score, pair, position_state, strategy_params, price_x, price_y,
-                       total_fees) -> tuple[float, float]:
-        wx = 1 / (beta + 1)
-        wy = 1 - wx
+    def _open_position(
+            cls,
+            ctx,
+            beta,
+            z_score,
+            position_state,
+            price_x,
+            price_y,
+            total_fees,
+            stop_loss,
+    ) -> tuple[float, float]:
+        wx = beta / (beta + 1)
+        wy = 1 / (beta + 1)
 
-        position_cash = abs(position_state.position) * pair.initial_cash
-        x_spread, y_spread = cls.get_spread(pair.x, pair.y, position_state.position)
+        x_spread, y_spread = cls.get_spread(ctx.ticker_x, ctx.ticker_y, position_state.position)
 
         if position_state.position > 0:
-            qx = position_cash * wx / (price_x * x_spread)
-            qy = -(position_cash * wy) / (price_y * y_spread)
+            qx = ctx.initial_cash * wx / (price_x * x_spread)
+            qy = -(ctx.initial_cash * wy) / (price_y * y_spread)
         elif position_state.position < 0:
-            qx = -(position_cash * wx) / (price_x * x_spread)
-            qy = position_cash * wy / (price_y * y_spread)
+            qx = -(ctx.initial_cash * wx) / (price_x * x_spread)
+            qy = ctx.initial_cash * wy / (price_y * y_spread)
         else:
-            raise ValueError("Position cannot be 0 while opening")
+            raise ValueError("Cannot open the position while 'position' is 0")
 
-        entry_value = abs(qx) * price_x + abs(qy) * price_y
-        if strategy_params.stop_loss is not None:
-            stop_loss_thr = abs(z_score * strategy_params.stop_loss)
+        if stop_loss is not None:
+            stop_loss_thr = abs(z_score * stop_loss)
         else:
             stop_loss_thr = None
 
-        position_state.update_position(position_state.position, position_state.prev_position, qx,
-                                       qy, wx, wy, entry_value, stop_loss_thr)
+        entry_dif = qx * (price_x * x_spread) + qy * (price_y * y_spread)
 
-        pos_fees = entry_value * pair.fee_rate
+        position_state.update_position(
+            position=position_state.position,
+            prev_position=position_state.prev_position,
+            q_x=qx,
+            q_y=qy,
+            w_x=wx,
+            w_y=wy,
+            stop_loss_threshold=stop_loss_thr,
+            entry_dif=entry_dif,
+        )
+
+        pos_fees = ctx.initial_cash * ctx.fee_rate
         t_fees = total_fees + pos_fees
+
         return 0, t_fees
 
     @classmethod
-    def _close_position(cls, pair, position_state, price_x, price_y, total_fees) -> tuple[float, float, dict]:
-        x_spread, y_spread = cls.get_spread(pair.x, pair.y, 0)
+    def _close_position(
+            cls, ctx, position_state, price_x, price_y, total_fees
+    ) -> tuple[float, float, dict]:
+        x_spread, y_spread = cls.get_spread(ctx.ticker_x, ctx.ticker_y, 0)
 
-        exit_value = abs(position_state.q_x) * (price_x * x_spread) + abs(position_state.q_y) * (price_y * y_spread)
-        pos_fees = exit_value * pair.fee_rate
+        exit_dif = position_state.q_x * (price_x * x_spread) + position_state.q_y * (price_y * y_spread)
+        exit_val = abs(position_state.q_x) * (price_x * x_spread) + abs(position_state.q_y) * (price_y * y_spread)
+        pos_fees = exit_val * ctx.fee_rate
 
-        if position_state.prev_position > 0:
-            pnl = exit_value - position_state.entry_val
-        elif position_state.prev_position < 0:
-            pnl = position_state.entry_val - exit_value
+        if position_state.prev_position < 0:
+            pnl = exit_dif - position_state.entry_dif
+        elif position_state.prev_position > 0:
+            pnl = position_state.entry_dif - exit_dif
         else:
-            raise ValueError("Position cannot be 0 while closing")
+            raise ValueError("Cannot close the position while 'position' is 0")
 
         position_state.clear_position()
-
         t_fees = total_fees + pos_fees
+
         return pnl, t_fees
 
     @staticmethod
     def _hold_position(position_state, price_x, price_y, total_fees):
-        curr_val = abs(position_state.q_x) * price_x + abs(position_state.q_y) * price_y
+        curr_dif = position_state.q_x * price_x + position_state.q_y * price_y
 
-        if position_state.prev_position > 0:
-            pnl = curr_val - position_state.entry_val
+        if position_state.prev_position < 0:
+            pnl = curr_dif - position_state.entry_dif
+        elif position_state.prev_position > 0:
+            pnl = position_state.entry_dif - curr_dif
         else:
-            pnl = position_state.entry_val - curr_val
+            raise ValueError("Cannot hold the position while 'position' is 0")
 
         position_state.position = position_state.prev_position
 

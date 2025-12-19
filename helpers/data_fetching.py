@@ -16,8 +16,6 @@ def fetch_data_from_binance(symbol: str, interval: str, start_str: str, end_str:
                             f"{symbol}_{start_str.replace('.', '')}-{end_str.replace('.', '')}_{interval}.csv")
 
     if os.path.isfile(filename):
-        print("Sprawdzam plik:", os.path.abspath(filename))
-
         print(f"{filename} already exists, skipping.")
         return
 
