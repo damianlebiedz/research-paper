@@ -17,16 +17,16 @@ class TradeExecutor:
 
     @classmethod
     def execute(
-            cls,
-            ctx: ExecutionContext,
-            position_state: PositionState,
-            price_x: float,
-            price_y: float,
-            z_score: float,
-            beta: float,
-            total_fees: float,
-            exit_threshold: float,
-            stop_loss: float,
+        cls,
+        ctx: ExecutionContext,
+        position_state: PositionState,
+        price_x: float,
+        price_y: float,
+        z_score: float,
+        beta: float,
+        total_fees: float,
+        exit_threshold: float,
+        stop_loss: float,
     ) -> tuple[float, float]:
         """
         Main execution method.
@@ -38,23 +38,23 @@ class TradeExecutor:
         if position_state.prev_position != 0:
             # CLOSE POSITION (STOP LOSS OR TAKE PROFIT)
             if (
-                    position_state.prev_position < 0
-                    and (
-                            z_score <= exit_threshold
-                            or (
-                                    position_state.stop_loss_threshold is not None
-                                    and z_score >= position_state.stop_loss_threshold
-                            )
+                position_state.prev_position < 0
+                and (
+                    z_score <= exit_threshold
+                    or (
+                        position_state.stop_loss_threshold is not None
+                        and z_score >= position_state.stop_loss_threshold
                     )
+                )
             ) or (
-                    position_state.prev_position > 0
-                    and (
-                            z_score >= -exit_threshold
-                            or (
-                                    position_state.stop_loss_threshold is not None
-                                    and z_score <= -position_state.stop_loss_threshold
-                            )
+                position_state.prev_position > 0
+                and (
+                    z_score >= -exit_threshold
+                    or (
+                        position_state.stop_loss_threshold is not None
+                        and z_score <= -position_state.stop_loss_threshold
                     )
+                )
             ):
                 return cls._close_position(
                     ctx, position_state, price_x, price_y, total_fees
@@ -84,20 +84,22 @@ class TradeExecutor:
 
     @classmethod
     def _open_position(
-            cls,
-            ctx,
-            beta,
-            z_score,
-            position_state,
-            price_x,
-            price_y,
-            total_fees,
-            stop_loss,
+        cls,
+        ctx,
+        beta,
+        z_score,
+        position_state,
+        price_x,
+        price_y,
+        total_fees,
+        stop_loss,
     ) -> tuple[float, float]:
         wx = beta / (beta + 1)
         wy = 1 / (beta + 1)
 
-        x_spread, y_spread = cls.get_spread(ctx.ticker_x, ctx.ticker_y, position_state.position)
+        x_spread, y_spread = cls.get_spread(
+            ctx.ticker_x, ctx.ticker_y, position_state.position
+        )
 
         if position_state.position > 0:
             qx = ctx.initial_cash * wx / (price_x * x_spread)
@@ -133,12 +135,16 @@ class TradeExecutor:
 
     @classmethod
     def _close_position(
-            cls, ctx, position_state, price_x, price_y, total_fees
-    ) -> tuple[float, float, dict]:
+        cls, ctx, position_state, price_x, price_y, total_fees
+    ) -> tuple[float, float]:
         x_spread, y_spread = cls.get_spread(ctx.ticker_x, ctx.ticker_y, 0)
 
-        exit_dif = position_state.q_x * (price_x * x_spread) + position_state.q_y * (price_y * y_spread)
-        exit_val = abs(position_state.q_x) * (price_x * x_spread) + abs(position_state.q_y) * (price_y * y_spread)
+        exit_dif = position_state.q_x * (price_x * x_spread) + position_state.q_y * (
+            price_y * y_spread
+        )
+        exit_val = abs(position_state.q_x) * (price_x * x_spread) + abs(
+            position_state.q_y
+        ) * (price_y * y_spread)
         pos_fees = exit_val * ctx.fee_rate
 
         if position_state.prev_position < 0:
@@ -154,7 +160,9 @@ class TradeExecutor:
         return pnl, t_fees
 
     @staticmethod
-    def _hold_position(position_state, price_x, price_y, total_fees):
+    def _hold_position(
+        position_state, price_x, price_y, total_fees
+    ) -> tuple[float, float]:
         curr_dif = position_state.q_x * price_x + position_state.q_y * price_y
 
         if position_state.prev_position < 0:

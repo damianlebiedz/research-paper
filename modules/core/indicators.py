@@ -4,7 +4,7 @@ import statsmodels.api as sm
 
 def generate_signal(entry_threshold: float, z_score: float) -> int:
     """
-    Generate signals for trades depends on current Z-Score.
+    Generate signals for trades depends on current z-score.
 
     Signal = 1:     Long X, Short Y
     Signal = -1:    Short X, Long Y
@@ -21,7 +21,7 @@ def generate_signal(entry_threshold: float, z_score: float) -> int:
 
 
 def calculate_beta(x_col: str, y_col: str, df: pd.DataFrame) -> float:
-    """Calculate beta from OLS with returns for a pair."""
+    """Calculate beta from OLS."""
     X = sm.add_constant(df[y_col])
     y = df[x_col]
     model = sm.OLS(y, X, missing="drop").fit()
@@ -30,10 +30,10 @@ def calculate_beta(x_col: str, y_col: str, df: pd.DataFrame) -> float:
     return beta
 
 
-def calculate_zscore(
+def calculate_z_score(
     x_col: str, y_col: str, beta: float, df: pd.DataFrame
-) -> float:
-    """Calculate Z-Score with beta and spread, mean, std from prices."""
+) -> float | None:
+    """Calculate z-score with provided beta."""
     spread_series = df[x_col] - (beta * df[y_col])
     mean = spread_series.mean()
     std = spread_series.std()

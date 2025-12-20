@@ -2,9 +2,14 @@ from typing import Literal
 import pandas as pd
 
 from modules.core.execution import TradeExecutor
-from modules.core.indicators import calculate_zscore, generate_signal, calculate_beta
+from modules.core.indicators import calculate_z_score, generate_signal, calculate_beta
 from modules.data_services.data_loaders import load_pair
-from modules.data_services.data_preparation import add_log_prices, add_returns
+from modules.data_services.data_preparation import (
+    add_log_prices,
+    add_c_norm_returns,
+    add_c_returns,
+    add_c_log_returns,
+)
 from modules.performance.optimization import bayesian_search
 from modules.core.models import PositionState, ExecutionContext, StrategyResult
 from modules.performance.stats import calculate_stats
@@ -12,23 +17,27 @@ from modules.performance.stats import calculate_stats
 
 class Strategy:
     def __init__(
-            self,
-            ticker_x: str,
-            ticker_y: str,
-            start: str,
-            end: str,
-            interval: str,
-            fee_rate: float,
-            initial_cash: float,
-            risk_free_rate_annual: float,
-            source: Literal["returns", "log_returns", "c_returns", "log"],
-            beta_hedge: Literal["dynamic_hedge", "static_hedge"] | None = None,
+        self,
+        ticker_x: str,
+        ticker_y: str,
+        start: str,
+        end: str,
+        interval: Literal["1d", "4h", "1h", "30m", "15m", "5m", "3m", "1m"],
+        fee_rate: float,
+        initial_cash: float,
+        risk_free_rate_annual: float,
+        source: Literal["log", "c_returns", "c_log_returns", "c_norm_returns"],
+        beta_hedge: Literal["dynamic_hedge", "static_hedge"] | None = None,
     ):
-        if not beta_hedge in ["dynamic_hedge", "static_hedge", "no_hedge"]:
-            raise ValueError("Invalid beta_hedge: should be 'dynamic_hedge' or 'static_hedge'")
+        if beta_hedge not in ["dynamic_hedge", "static_hedge", None]:
+            raise ValueError(
+                "Invalid beta_hedge: should be 'dynamic_hedge', 'static_hedge' or None"
+            )
 
-        if not source in ["returns", "log_returns", "c_returns", "log"]:
-            raise ValueError("Invalid source: should be 'returns', 'log_returns', 'c_returns', 'log'")
+        if source not in ["log", "c_returns", "c_log_returns", "c_norm_returns"]:
+            raise ValueError(
+                "Invalid source: should be 'log', 'c_returns', 'c_log_returns', or 'c_norm_returns'"
+            )
 
         self.ticker_x = ticker_x
         self.ticker_y = ticker_y
@@ -52,21 +61,26 @@ class Strategy:
             x=ticker_x, y=ticker_y, start=start, end=end, interval=interval
         )
 
-        add_returns(self.data, self.ticker_x, self.ticker_y)
-        add_log_prices(self.data, self.ticker_x, self.ticker_y)
+        source_map = {
+            "c_norm_returns": add_c_norm_returns,
+            "c_returns": add_c_returns,
+            "c_log_returns": add_c_log_returns,
+            "log": add_log_prices,
+        }
+        func_to_call = source_map[self.source]
+        func_to_call(self.data, self.ticker_x, self.ticker_y)
 
     def _execute_loop(
-            self,
-            df: pd.DataFrame,
-            beta_hedge: str,
-            source: str,
-            rolling_window: int,
-            entry_threshold: float,
-            exit_threshold: float,
-            stop_loss: float,
-            test_start: str,
-            test_end: str,
-            beta_calculation_start: str | None = None,
+        self,
+        df: pd.DataFrame,
+        rolling_window: int,
+        entry_threshold: float,
+        exit_threshold: float,
+        stop_loss: float,
+        test_start: str,
+        test_end: str,
+        beta_calculation_start: str | None = None,
+        beta_hedge: Literal["dynamic_hedge", "static_hedge"] | None = None,
     ) -> pd.DataFrame:
         df = df.copy()
 
@@ -79,11 +93,8 @@ class Strategy:
 
         position_state = PositionState()
 
-        if source in ['returns', 'log_returns', 'c_returns', 'log']:
-            source_x_col = f"{x_col}_{source}"
-            source_y_col = f"{y_col}_{source}"
-        else:
-            raise ValueError("'source' must be 'returns', 'log_returns', 'c_returns', or 'log'")
+        source_x_col = f"{x_col}_{self.source}"
+        source_y_col = f"{y_col}_{self.source}"
 
         test_start_pos = df.index.get_loc(pd.to_datetime(test_start))
         if test_start_pos - rolling_window < 0:
@@ -91,8 +102,10 @@ class Strategy:
 
         start_pos = None
         if beta_calculation_start is None:
-            if beta_hedge in ['static_hedge', 'dynamic_hedge']:
-                raise ValueError("'start' must be provided for 'static_hedge' or 'dynamic_hedge'")
+            if beta_hedge in ["static_hedge", "dynamic_hedge"]:
+                raise ValueError(
+                    "'start' must be provided for 'static_hedge' or 'dynamic_hedge'"
+                )
             else:
                 pass
         else:
@@ -122,17 +135,17 @@ class Strategy:
                 beta = calculate_beta(
                     x_col=source_x_col,
                     y_col=source_y_col,
-                    df=df.iloc[start_pos+i-test_start_pos:i],
+                    df=df.iloc[start_pos + i - test_start_pos : i],
                 )
 
-            z_score = calculate_zscore(
+            z_score = calculate_z_score(
                 x_col=source_x_col,
                 y_col=source_y_col,
                 beta=beta,
-                df=df.iloc[i-rolling_window:i],
+                df=df.iloc[i - rolling_window : i],
             )
 
-            signal = generate_signal(entry_threshold, z_score)
+            signal = generate_signal(entry_threshold=entry_threshold, z_score=z_score)
 
             if beta > 0:
                 position_state.position = signal
@@ -178,27 +191,23 @@ class Strategy:
         df["total_return_pct"] = df["total_return"] / self.initial_cash
         df["net_return_pct"] = df["net_return"] / self.initial_cash
 
-        df = df.iloc[test_start_pos:end_pos + 1].copy()
+        df = df.iloc[test_start_pos : end_pos + 1].copy()
 
-        return df.drop(columns=[f"{x_col}_log", f"{y_col}_log", f"{x_col}_returns", f"{y_col}_returns", f"{x_col}_c_returns",
-                         f"{y_col}_c_returns", f"{x_col}_log_returns", f"{y_col}_log_returns", f"{x_col}_c_log_returns",
-                         f"{y_col}_c_log_returns"])
+        return df.drop(columns=[source_x_col, source_y_col])
 
     def run_strategy(
-            self,
-            rolling_window: int,
-            entry_threshold: float,
-            exit_threshold: float,
-            stop_loss: float,
-            test_start: str,
-            test_end: str,
-            beta_calculation_start: str | None = None,
-    ) -> pd.DataFrame:
+        self,
+        rolling_window: int,
+        entry_threshold: float,
+        exit_threshold: float,
+        stop_loss: float,
+        test_start: str,
+        test_end: str,
+        beta_calculation_start: str | None = None,
+    ) -> StrategyResult:
 
         data = self._execute_loop(
             df=self.data,
-            beta_hedge=self.beta_hedge,
-            source=self.source,
             rolling_window=rolling_window,
             entry_threshold=entry_threshold,
             exit_threshold=exit_threshold,
@@ -206,13 +215,14 @@ class Strategy:
             test_start=test_start,
             test_end=test_end,
             beta_calculation_start=beta_calculation_start,
+            beta_hedge=self.beta_hedge,
         )
 
         stats = calculate_stats(
             df=data,
             initial_cash=self.initial_cash,
             interval=self.interval,
-            risk_free_rate_annual=self.risk_free_rate_annual
+            risk_free_rate_annual=self.risk_free_rate_annual,
         )
 
         return StrategyResult(
@@ -227,20 +237,20 @@ class Strategy:
         )
 
     def run_optimization(
-            self,
-            opt_start: str,
-            opt_end: str,
-            param_space: list,
-            metric: tuple = (str, Literal["gross", "net"]),  # e.g. metric = ("sortino_ratio", "net")
-            static_params: dict | None = None,
+        self,
+        opt_start: str,
+        opt_end: str,
+        static_params: dict,
+        param_space: list,
+        metric: tuple[str, str],
     ) -> tuple[dict, float]:
 
         def objective_wrapper(
-                rolling_window: int,
-                entry_threshold: float,
-                exit_threshold: float,
-                stop_loss: float,
-        ) -> tuple[float, pd.DataFrame]:
+            rolling_window: int,
+            entry_threshold: float,
+            exit_threshold: float,
+            stop_loss: float,
+        ) -> float:
             try:
                 result = self.run_strategy(
                     rolling_window=int(rolling_window),

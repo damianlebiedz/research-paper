@@ -1,5 +1,4 @@
 from typing import Callable
-
 from skopt import gp_minimize
 from skopt.space import Integer, Real
 import numpy as np
@@ -11,7 +10,7 @@ def random_search(
     strategy_func: Callable,
     param_space: list,
     static_params: dict,
-    metric: tuple,
+    metric: tuple[str, str],
     n_iter: int = 1000,
     n_jobs: int = -1,
     replicates: int = 1,
@@ -56,7 +55,7 @@ def bayesian_search(
     strategy_func: Callable,
     param_space: list,
     static_params: dict,
-    metric: tuple,
+    metric: tuple[str, str],
     n_iter: int = 100,
     n_jobs: int = -1,
     replicates: int = 1,

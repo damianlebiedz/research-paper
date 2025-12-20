@@ -20,7 +20,10 @@ def _resolve_results_dir(directory: str | None) -> Path:
 
 
 def plot_zscore(
-    result: StrategyResult, directory: str | None = None, save: bool = False, show: bool = True
+    result: StrategyResult,
+    directory: str | None = None,
+    save: bool = False,
+    show: bool = True,
 ) -> None:
     x, y = result.ticker_x, result.ticker_y
     start, end = result.start, result.end
@@ -54,7 +57,10 @@ def plot_zscore(
 
 
 def plot_positions(
-    result: StrategyResult, directory: str | None = None, save: bool = False, show: bool = True
+    result: StrategyResult,
+    directory: str | None = None,
+    save: bool = False,
+    show: bool = True,
 ) -> None:
     x, y, start, end, interval = (
         result.ticker_x,

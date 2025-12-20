@@ -9,3 +9,5 @@ data/*
 
 results/*
 !results/.ignore
+
+scripts/*/outputs

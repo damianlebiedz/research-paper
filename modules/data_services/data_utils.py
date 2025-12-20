@@ -1,11 +1,15 @@
 from functools import reduce
 from pathlib import Path
+from typing import Literal
+
 import pandas as pd
 
 from modules.data_services.data_loaders import load_data
 
 
-def get_steps(interval: str) -> int:
+def get_steps(
+    interval: Literal["1d", "4h", "1h", "30m", "15m", "5m", "3m", "1m"],
+) -> int:
     """Get steps of the interval."""
     if interval == "1d":
         return 1
@@ -24,7 +28,7 @@ def get_steps(interval: str) -> int:
     elif interval == "1m":
         return 1440
     else:
-        return ValueError(
+        raise ValueError(
             f"Wrong interval '{interval}', should be one of: '1d', '4h', '1h', '30m', '15m', '5m', '3m', '1m'."
         )
 

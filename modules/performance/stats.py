@@ -1,3 +1,4 @@
+from typing import Literal
 import numpy as np
 import pandas as pd
 
@@ -5,10 +6,10 @@ from modules.data_services.data_utils import get_steps
 
 
 def calculate_stats(
-        df: pd.DataFrame,
-        initial_cash: float,
-        interval: str,
-        risk_free_rate_annual: float
+    df: pd.DataFrame,
+    initial_cash: float,
+    interval: Literal["1d", "4h", "1h", "30m", "15m", "5m", "3m", "1m"],
+    risk_free_rate_annual: float,
 ) -> pd.DataFrame:
     steps_per_day = get_steps(interval)
     periods_per_year = steps_per_day * 365
@@ -101,7 +102,7 @@ def calculate_stats(
             sharpe_ratio = None
         sharpe_ratio_annual = (
             (cagr - risk_free_rate_annual) / annual_volatility
-            if sharpe_ratio is not None
+            if annual_volatility not in (0, None)
             else None
         )
 
